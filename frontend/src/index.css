@@ -1,0 +1,91 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@keyframes bubbleFloatA {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(22px, 14px, 0);
+  }
+}
+
+@keyframes bubbleFloatB {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-18px, 18px, 0);
+  }
+}
+
+@keyframes bubbleFloatC {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(18px, -20px, 0);
+  }
+}
+
+@keyframes bubbleFloatD {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-24px, -14px, 0);
+  }
+}
+
+.bubble-float-a {
+  animation: bubbleFloatA 12s ease-in-out infinite;
+}
+
+.bubble-float-b {
+  animation: bubbleFloatB 10s ease-in-out infinite;
+}
+
+.bubble-float-c {
+  animation: bubbleFloatC 13s ease-in-out infinite;
+}
+
+.bubble-float-d {
+  animation: bubbleFloatD 11s ease-in-out infinite;
+}
+
+.btn-themed-fill {
+  background-color: var(--btn-bg);
+  color: var(--btn-text, #fff);
+  border-color: transparent;
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.btn-themed-fill:hover {
+  background-color: var(--btn-bg-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px
+    color-mix(in srgb, var(--btn-bg-hover) 28%, transparent);
+}
+
+.btn-themed-outline {
+  background-color: transparent;
+  border: 2px solid var(--btn-border);
+  color: var(--btn-color);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.btn-themed-outline:hover {
+  background-color: var(--btn-border);
+  color: var(--btn-hover-text, #fff);
+  transform: translateY(-1px);
+}

@@ -1,0 +1,44 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json",
+    "tsconfigRootDir": ".",
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "extends": [
+    "airbnb-base",
+    "airbnb-typescript/base",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "env": {
+    "node": true,
+    "es2021": true
+  },
+  "rules": {
+    /* ---------- Imports ---------- */
+    "import/extensions": "off",
+    "import/no-unresolved": "off",
+    "no-nested-ternary": "off",
+
+    /* ---------- TS overrides ---------- */
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_" }
+    ],
+    "@typescript-eslint/consistent-type-imports": "error",
+
+    /* ---------- Pragmatic backend rules ---------- */
+    "import/prefer-default-export": "off",
+    "no-await-in-loop": "off",
+    "no-restricted-syntax": "off",
+    "no-inner-declarations": "off",
+
+    /* ---------- Prisma / DB helpers ---------- */
+    "no-underscore-dangle": [
+      "error",
+      { "allow": ["_sum", "_count", "_avg", "_min", "_max"] }
+    ]
+  }
+}
