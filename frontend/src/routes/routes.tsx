@@ -9,6 +9,10 @@ import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import NotFound from "../components/NotFound";
 import LandingPage from "../pages/landing/LandingPage";
+import ChatPage from "../pages/chat/ChatPage";
+import ProfilePage from "../pages/profile/ProfilePage";
+import AccountPage from "../pages/account/AccountPage";
+import SettingsPage from "../pages/settings/SettingsPage";
 
 const routes: RouteObject[] = [
   {
@@ -51,6 +55,22 @@ const routes: RouteObject[] = [
       {
         path: "dashboard",
         element: <DashboardPage />,
+      },
+      {
+        path: "chat",
+        element: <ChatPage />,
+      },
+      {
+        path: "profile",
+        element: <ProfilePage />,
+      },
+      {
+        path: "account",
+        element: <AccountPage />,
+      },
+      {
+        path: "settings",
+        element: <SettingsPage />,
       },
     ],
   },

@@ -8,16 +8,18 @@ datasource db {
 }
 
 model User {
-  id            String    @id
+  id            String       @id
   name          String
   email         String
-  emailVerified Boolean   @default(false)
+  emailVerified Boolean      @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @default(now()) @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
   sessions      Session[]
   accounts      Account[]
   profiles      Profile[]
+  ownedRooms    Room[]       @relation("RoomOwner")
+  roomMembers   RoomMember[]
 
   @@unique([email])
   @@map("user")
@@ -72,6 +74,7 @@ model Profile {
   id          String   @id @default(cuid())
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  username    String   @unique @db.VarChar(30)
   bio         String?
   displayName String?
   avatarUrl   String?
@@ -79,4 +82,46 @@ model Profile {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("profile")
+}
+
+model Room {
+  id        Int          @id @default(autoincrement())
+  name      String       @db.VarChar(100)
+  isPrivate Boolean      @default(false) @map("is_private")
+  avatarUrl String?      @map("avatar_url")
+  ownerId   String       @map("owner_id")
+  owner     User         @relation("RoomOwner", fields: [ownerId], references: [id])
+  createdAt DateTime     @default(now()) @map("created_at")
+  members   RoomMember[]
+  invites   RoomInvite[]
+
+  @@index([ownerId])
+  @@map("rooms")
+}
+
+model RoomMember {
+  id       Int      @id @default(autoincrement())
+  roomId   Int      @map("room_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@map("room_members")
+}
+
+model RoomInvite {
+  id        Int      @id @default(autoincrement())
+  roomId    Int      @map("room_id")
+  email     String   @db.VarChar(255)
+  token     String   @db.VarChar(255)
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_invites")
 }

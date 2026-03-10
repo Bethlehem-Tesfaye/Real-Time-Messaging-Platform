@@ -1,6 +1,4 @@
 import multer, { type FileFilterCallback } from "multer";
-// @ts-expect-error -- no types available for 'multer-storage-cloudinary'
-import { CloudinaryStorage } from "multer-storage-cloudinary";
 import type { Request } from "express";
 import { cloudinary } from "../lib/cloudinary";
 
@@ -9,13 +7,8 @@ interface AuthenticatedRequest extends Request {
 }
 
 export const makeUploader = (folder: string) => {
-  const storage = new CloudinaryStorage({
-    cloudinary,
-    params: async (req: AuthenticatedRequest, _file: Express.Multer.File) => ({
-      folder,
-      public_id: `${Date.now()}-${req.userId ?? "anonymous"}`
-    })
-  });
+  void folder;
+  const storage = multer.memoryStorage();
 
   const fileFilter = (
     req: AuthenticatedRequest,
@@ -35,5 +28,30 @@ export const makeUploader = (folder: string) => {
     limits: {
       fileSize: 5 * 1024 * 1024 // 5MB
     }
+  });
+};
+
+export const uploadImageToCloudinary = async (
+  file: Express.Multer.File,
+  folder: string,
+  userId?: string
+) => {
+  return new Promise<string>((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        public_id: `${Date.now()}-${userId ?? "anonymous"}`
+      },
+      (error, result) => {
+        if (error || !result?.secure_url) {
+          reject(error ?? new Error("Cloudinary upload failed"));
+          return;
+        }
+
+        resolve(result.secure_url);
+      }
+    );
+
+    uploadStream.end(file.buffer);
   });
 };

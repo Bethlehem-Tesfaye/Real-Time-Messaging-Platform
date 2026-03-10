@@ -4,6 +4,6 @@ export const useGoogleAuth = () => {
   return () =>
     authClient.signIn.social({
       provider: "google",
-      callbackURL: `${window.location.origin}/dashboard`,
+      callbackURL: `${window.location.origin}/verify-email`,
     });
 };
