@@ -1,12 +1,4 @@
-import {
-  ChevronRight,
-  Crown,
-  File,
-  Folder,
-  Image,
-  Link2,
-  Video,
-} from "lucide-react";
+import { ChevronRight, Crown } from "lucide-react";
 import { colors } from "../../../config/theme";
 
 type RoomDetailsSidebarProps = {
