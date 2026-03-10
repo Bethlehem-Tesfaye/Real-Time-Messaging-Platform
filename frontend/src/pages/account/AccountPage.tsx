@@ -6,7 +6,7 @@ const AccountPage = () => {
   return (
     <div className="h-screen w-full" style={{ backgroundColor: colors.bg }}>
       <div
-        className="flex h-full w-full flex-row"
+        className="flex h-full w-full flex-row p-2"
         style={{
           backgroundColor: "#FFFFFF",
         }}
