@@ -45,7 +45,7 @@ const MessageInput = ({
           type="button"
           onClick={onSend}
           disabled={disabled}
-          className="grid h-9 w-9 place-items-center rounded-xl text-white disabled:opacity-60"
+          className="grid h-9 w-9 place-items-center rounded-xl cursor-pointer text-white disabled:opacity-60"
           style={{ backgroundColor: colors.online }}
         >
           <Send className="h-4 w-4" />

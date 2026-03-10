@@ -20,6 +20,10 @@ export type JoinRoomSocketPayload = {
   roomId: number;
 };
 
+export type LeaveRoomSocketPayload = {
+  roomId: number;
+};
+
 export type SendMessageSocketPayload = {
   roomId: number;
   content: string;

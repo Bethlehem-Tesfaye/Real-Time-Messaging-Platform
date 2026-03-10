@@ -7,6 +7,7 @@ import type { ChatMessage, RoomListItem } from "../types/chat";
 type ChatMainPanelProps = {
   selectedRoom?: RoomListItem;
   memberCount: number;
+  memberCountLoading: boolean;
   messages: ChatMessage[];
   messagesLoading: boolean;
   currentUserId?: string;
@@ -14,7 +15,6 @@ type ChatMainPanelProps = {
   onMessageInputChange: (value: string) => void;
   onSendMessage: () => void;
   canJoin: boolean;
-  membershipLoading: boolean;
   onJoinRoom: () => void;
   joiningRoom: boolean;
   onOpenRooms?: () => void;
@@ -24,6 +24,7 @@ type ChatMainPanelProps = {
 const ChatMainPanel = ({
   selectedRoom,
   memberCount,
+  memberCountLoading,
   messages,
   messagesLoading,
   currentUserId,
@@ -31,7 +32,6 @@ const ChatMainPanel = ({
   onMessageInputChange,
   onSendMessage,
   canJoin,
-  membershipLoading,
   onJoinRoom,
   joiningRoom,
   onOpenRooms,
@@ -66,10 +66,7 @@ const ChatMainPanel = ({
       <RoomHeader
         roomName={selectedRoom.name}
         memberCount={memberCount}
-        canJoin={canJoin}
-        membershipLoading={membershipLoading}
-        joiningRoom={joiningRoom}
-        onJoinRoom={onJoinRoom}
+        memberCountLoading={memberCountLoading}
         onOpenRooms={onOpenRooms}
         onOpenDetails={onOpenDetails}
       />
@@ -78,13 +75,16 @@ const ChatMainPanel = ({
         messages={messages}
         currentUserId={currentUserId}
         loading={messagesLoading}
+        showJoinPrompt={canJoin}
+        joiningRoom={joiningRoom}
+        onJoinRoom={onJoinRoom}
       />
 
       <MessageInput
         value={messageInput}
         onChange={onMessageInputChange}
         onSend={onSendMessage}
-        disabled={joiningRoom}
+        disabled={joiningRoom || canJoin}
       />
     </main>
   );

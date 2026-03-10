@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { colors } from "../../../config/theme";
+import { api } from "../../../lib/axios";
 import { connectSocket } from "../../../lib/socket";
 import ChatMainPanel from "./ChatMainPanel";
 import ChatNavRail from "./ChatNavRail";
@@ -15,11 +17,12 @@ import { useRoomDetails } from "../hooks/useRoomDetails";
 import { useRoomMembership } from "../hooks/useRoomMembership";
 import { useRooms } from "../hooks/useRooms";
 import { useUpdateRoom } from "../hooks/useUpdateRoom";
-import type { ChatMessage } from "../types/chat";
+import type { ChatMessage, RoomMembershipResponse } from "../types/chat";
 
 type RoomFilterScope = "all" | "created" | "member";
 
 const ChatLayout = () => {
+  const queryClient = useQueryClient();
   const [selectedRoomId, setSelectedRoomId] = useState<number | undefined>(
     undefined,
   );
@@ -51,10 +54,16 @@ const ChatLayout = () => {
 
   const { data: roomDetails, isLoading: roomLoading } =
     useRoomDetails(selectedRoomId);
-  const { data: messageHistory = [], isLoading: messagesLoading } =
-    useRoomMessages(selectedRoomId, 100);
   const { data: membershipData, isLoading: membershipLoading } =
     useRoomMembership(selectedRoomId);
+  const isMember = membershipData?.isMember === true;
+  const canJoin = membershipData ? !membershipData.isMember : false;
+  const { data: messageHistory = [], isLoading: messagesLoading } =
+    useRoomMessages(selectedRoomId, 100, isMember);
+  const shouldShowMessageSkeleton =
+    membershipLoading ||
+    joinRoomMutation.isPending ||
+    (isMember && messagesLoading);
 
   const mergeMessages = (messages: ChatMessage[]): ChatMessage[] => {
     const dedup = new Map<number, ChatMessage>();
@@ -98,6 +107,12 @@ const ChatLayout = () => {
   useEffect(() => {
     setRoomMessages(messageHistory);
   }, [messageHistory, selectedRoomId]);
+
+  useEffect(() => {
+    if (!isMember) {
+      setRoomMessages([]);
+    }
+  }, [isMember, selectedRoomId]);
 
   useEffect(() => {
     const socket = connectSocket();
@@ -145,7 +160,41 @@ const ChatLayout = () => {
       return;
     }
 
+    setRoomMessages([]);
+
     await joinRoomMutation.mutateAsync(selectedRoomId);
+
+    queryClient.setQueryData<RoomMembershipResponse>(
+      ["room-membership", selectedRoomId],
+      {
+        roomId: selectedRoomId,
+        isMember: true,
+      },
+    );
+
+    await queryClient.invalidateQueries({
+      queryKey: ["room-membership", selectedRoomId],
+    });
+
+    const socket = connectSocket();
+    socket.emit("join_room", { roomId: selectedRoomId });
+
+    await queryClient.invalidateQueries({
+      queryKey: ["room-messages", selectedRoomId],
+    });
+
+    const { data: freshMessages } = await api.get<ChatMessage[]>(
+      `/api/messages/rooms/${selectedRoomId}`,
+      {
+        params: { limit: 100 },
+      },
+    );
+
+    queryClient.setQueryData(
+      ["room-messages", selectedRoomId, 100],
+      freshMessages,
+    );
+    setRoomMessages(freshMessages);
   };
 
   const onUpdateRoom = async (payload: {
@@ -164,9 +213,25 @@ const ChatLayout = () => {
 
   const onLeaveRoom = async (roomId: number) => {
     await leaveRoomMutation.mutateAsync(roomId);
+
+    const socket = connectSocket();
+    socket.emit("leave_room", { roomId });
+
+    if (selectedRoomId === roomId) {
+      setRoomMessages([]);
+      setMessageInput("");
+      await queryClient.invalidateQueries({
+        queryKey: ["room-membership", roomId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["room-messages", roomId],
+      });
+    }
   };
 
   const onSelectRoom = (roomId: number) => {
+    setRoomMessages([]);
+    setMessageInput("");
     setSelectedRoomId(roomId);
     setIsMobileRoomsOpen(false);
   };
@@ -227,14 +292,14 @@ const ChatLayout = () => {
         <ChatMainPanel
           selectedRoom={selectedRoom}
           memberCount={roomLoading ? 0 : (roomDetails?.members.length ?? 0)}
+          memberCountLoading={roomLoading}
           messages={roomMessages}
-          messagesLoading={messagesLoading}
+          messagesLoading={shouldShowMessageSkeleton}
           currentUserId={user?.id}
           messageInput={messageInput}
           onMessageInputChange={setMessageInput}
           onSendMessage={onSendMessage}
-          canJoin={membershipData ? !membershipData.isMember : false}
-          membershipLoading={membershipLoading}
+          canJoin={canJoin}
           onJoinRoom={onJoinSelectedRoom}
           joiningRoom={joinRoomMutation.isPending}
           onOpenRooms={() => {

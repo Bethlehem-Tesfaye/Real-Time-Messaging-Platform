@@ -12,6 +12,7 @@ import {
 } from "./modules/message/message.service";
 import type {
   JoinRoomSocketPayload,
+  LeaveRoomSocketPayload,
   SendMessageSocketPayload,
   SocketAck
 } from "./modules/message/types";
@@ -121,6 +122,28 @@ export const registerSocketServer = (httpServer: HttpServer) => {
         } catch (err) {
           logger.error({ err }, "join_room failed");
           ack?.({ ok: false, message: "Failed to join room" });
+        }
+      }
+    );
+
+    socket.on(
+      "leave_room",
+      async (
+        payload: LeaveRoomSocketPayload,
+        ack?: (response: SocketAck) => void
+      ) => {
+        try {
+          const roomId = Number(payload?.roomId);
+          if (!Number.isInteger(roomId) || roomId <= 0) {
+            ack?.({ ok: false, message: "Invalid room id" });
+            return;
+          }
+
+          await socket.leave(getRoomChannel(roomId));
+          ack?.({ ok: true });
+        } catch (err) {
+          logger.error({ err }, "leave_room failed");
+          ack?.({ ok: false, message: "Failed to leave room channel" });
         }
       }
     );

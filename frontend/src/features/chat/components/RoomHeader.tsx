@@ -3,10 +3,7 @@ import { colors } from "../../../config/theme";
 type RoomHeaderProps = {
   roomName: string;
   memberCount: number;
-  canJoin: boolean;
-  membershipLoading: boolean;
-  joiningRoom: boolean;
-  onJoinRoom: () => void;
+  memberCountLoading: boolean;
   onOpenRooms?: () => void;
   onOpenDetails?: () => void;
 };
@@ -14,10 +11,7 @@ type RoomHeaderProps = {
 const RoomHeader = ({
   roomName,
   memberCount,
-  canJoin,
-  membershipLoading,
-  joiningRoom,
-  onJoinRoom,
+  memberCountLoading,
   onOpenRooms,
   onOpenDetails,
 }: RoomHeaderProps) => {
@@ -33,9 +27,17 @@ const RoomHeader = ({
         >
           {roomName}
         </h1>
-        <p className="text-xs sm:text-sm" style={{ color: colors.secondary }}>
-          {memberCount} members
-        </p>
+        {memberCountLoading ? (
+          <div
+            className="mt-1 h-4 w-24 animate-pulse rounded"
+            style={{ backgroundColor: `${colors.secondary}22` }}
+            aria-label="Loading member count"
+          />
+        ) : (
+          <p className="text-xs sm:text-sm" style={{ color: colors.secondary }}>
+            {memberCount} members
+          </p>
+        )}
       </div>
 
       <div className="ml-3 flex items-center gap-2 xl:gap-3">
@@ -71,18 +73,6 @@ const RoomHeader = ({
         >
           Messages
         </div>
-
-        {!membershipLoading && canJoin && (
-          <button
-            type="button"
-            onClick={onJoinRoom}
-            disabled={joiningRoom}
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 xl:px-5 xl:text-[0.95rem]"
-            style={{ backgroundColor: colors.secondary }}
-          >
-            {joiningRoom ? "Joining..." : "Join"}
-          </button>
-        )}
       </div>
     </header>
   );
