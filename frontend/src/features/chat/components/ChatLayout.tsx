@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { colors } from "../../../config/theme";
+import { connectSocket } from "../../../lib/socket";
 import ChatMainPanel from "./ChatMainPanel";
 import ChatNavRail from "./ChatNavRail";
 import GroupsSidebar from "./GroupsSidebar";
@@ -9,10 +10,12 @@ import { useCreateRoom } from "../hooks/useCreateRoom";
 import { useDeleteRoom } from "../hooks/useDeleteRoom";
 import { useJoinRoom } from "../hooks/useJoinRoom";
 import { useLeaveRoom } from "../hooks/useLeaveRoom";
+import { useRoomMessages } from "../hooks/useRoomMessages";
 import { useRoomDetails } from "../hooks/useRoomDetails";
 import { useRoomMembership } from "../hooks/useRoomMembership";
 import { useRooms } from "../hooks/useRooms";
 import { useUpdateRoom } from "../hooks/useUpdateRoom";
+import type { ChatMessage } from "../types/chat";
 
 type RoomFilterScope = "all" | "created" | "member";
 
@@ -27,6 +30,8 @@ const ChatLayout = () => {
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [isMobileRoomsOpen, setIsMobileRoomsOpen] = useState(false);
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
+  const [messageInput, setMessageInput] = useState("");
+  const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
 
   const { user } = useCurrentUser();
   const { data: rooms = [], isLoading: roomsLoading } = useRooms({
@@ -46,8 +51,22 @@ const ChatLayout = () => {
 
   const { data: roomDetails, isLoading: roomLoading } =
     useRoomDetails(selectedRoomId);
+  const { data: messageHistory = [], isLoading: messagesLoading } =
+    useRoomMessages(selectedRoomId, 100);
   const { data: membershipData, isLoading: membershipLoading } =
     useRoomMembership(selectedRoomId);
+
+  const mergeMessages = (messages: ChatMessage[]): ChatMessage[] => {
+    const dedup = new Map<number, ChatMessage>();
+
+    messages.forEach((message) => {
+      dedup.set(message.id, message);
+    });
+
+    return Array.from(dedup.values()).sort(
+      (a, b) => +new Date(a.createdAt) - +new Date(b.createdAt),
+    );
+  };
 
   const ownerName = useMemo(() => {
     if (!selectedRoom || !roomDetails) {
@@ -75,6 +94,37 @@ const ChatLayout = () => {
       setSelectedRoomId(rooms[0].id);
     }
   }, [rooms, selectedRoomId]);
+
+  useEffect(() => {
+    setRoomMessages(messageHistory);
+  }, [messageHistory, selectedRoomId]);
+
+  useEffect(() => {
+    const socket = connectSocket();
+
+    const onReceiveMessage = (message: ChatMessage) => {
+      if (message.roomId !== selectedRoomId) {
+        return;
+      }
+
+      setRoomMessages((prev) => mergeMessages([...prev, message]));
+    };
+
+    socket.on("receive_message", onReceiveMessage);
+
+    return () => {
+      socket.off("receive_message", onReceiveMessage);
+    };
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    if (!selectedRoomId) {
+      return;
+    }
+
+    const socket = connectSocket();
+    socket.emit("join_room", { roomId: selectedRoomId });
+  }, [selectedRoomId]);
 
   const onCreateRoom = async (payload: {
     name: string;
@@ -121,6 +171,24 @@ const ChatLayout = () => {
     setIsMobileRoomsOpen(false);
   };
 
+  const onSendMessage = () => {
+    if (!selectedRoomId) {
+      return;
+    }
+
+    const content = messageInput.trim();
+    if (content.length === 0) {
+      return;
+    }
+
+    const socket = connectSocket();
+    socket.emit("send_message", {
+      roomId: selectedRoomId,
+      content,
+    });
+    setMessageInput("");
+  };
+
   return (
     <div className="h-screen w-full " style={{ backgroundColor: colors.bg }}>
       <div
@@ -158,6 +226,13 @@ const ChatLayout = () => {
 
         <ChatMainPanel
           selectedRoom={selectedRoom}
+          memberCount={roomLoading ? 0 : (roomDetails?.members.length ?? 0)}
+          messages={roomMessages}
+          messagesLoading={messagesLoading}
+          currentUserId={user?.id}
+          messageInput={messageInput}
+          onMessageInputChange={setMessageInput}
+          onSendMessage={onSendMessage}
           canJoin={membershipData ? !membershipData.isMember : false}
           membershipLoading={membershipLoading}
           onJoinRoom={onJoinSelectedRoom}

@@ -20,6 +20,7 @@ model User {
   profiles      Profile[]
   ownedRooms    Room[]       @relation("RoomOwner")
   roomMembers   RoomMember[]
+  messages      Message[]
 
   @@unique([email])
   @@map("user")
@@ -94,6 +95,7 @@ model Room {
   createdAt DateTime     @default(now()) @map("created_at")
   members   RoomMember[]
   invites   RoomInvite[]
+  messages  Message[]
 
   @@index([ownerId])
   @@map("rooms")
@@ -124,4 +126,18 @@ model RoomInvite {
 
   @@index([roomId])
   @@map("room_invites")
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.Text
+  senderId  String   @map("sender_id")
+  roomId    Int      @map("room_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([createdAt])
+  @@map("messages")
 }
