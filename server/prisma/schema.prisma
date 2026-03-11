@@ -8,19 +8,20 @@ datasource db {
 }
 
 model User {
-  id            String       @id
+  id            String         @id
   name          String
   email         String
-  emailVerified Boolean      @default(false)
+  emailVerified Boolean        @default(false)
   image         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @default(now()) @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
   sessions      Session[]
   accounts      Account[]
   profiles      Profile[]
-  ownedRooms    Room[]       @relation("RoomOwner")
+  ownedRooms    Room[]         @relation("RoomOwner")
   roomMembers   RoomMember[]
   messages      Message[]
+  notifications Notification[]
 
   @@unique([email])
   @@map("user")
@@ -140,4 +141,19 @@ model Message {
   @@index([roomId])
   @@index([createdAt])
   @@map("messages")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  type      String   @db.VarChar(50)
+  data      Json
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([createdAt])
+  @@map("notifications")
 }
