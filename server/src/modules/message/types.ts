@@ -6,6 +6,10 @@ export type RoomMessagesQuery = {
   limit?: string;
 };
 
+export type CreateRoomMessageBody = {
+  content: string;
+};
+
 export type MessageItem = {
   id: number;
   content: string;

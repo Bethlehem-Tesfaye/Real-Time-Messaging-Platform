@@ -15,6 +15,7 @@ type GroupsSidebarProps = {
   rooms: RoomListItem[];
   roomsLoading: boolean;
   selectedRoomId?: number;
+  unreadCounts: Record<number, number>;
   currentUserId?: string;
   activeTab: RoomTab;
   searchQuery: string;
@@ -47,6 +48,7 @@ const GroupsSidebar = ({
   rooms,
   roomsLoading,
   selectedRoomId,
+  unreadCounts,
   currentUserId,
   activeTab,
   searchQuery,
@@ -387,6 +389,9 @@ const GroupsSidebar = ({
               filteredRooms.map((room) => {
                 const isActive = selectedRoomId === room.id;
                 const isOwner = currentUserId === room.ownerId;
+                const unreadCount = unreadCounts[room.id] ?? 0;
+                const showUnreadBadge = unreadCount > 0;
+
                 return (
                   <button
                     key={room.id}
@@ -429,6 +434,14 @@ const GroupsSidebar = ({
                             <span className="truncate text-[1.08rem] font-semibold xl:text-[1.16rem]">
                               {room.name}
                             </span>
+                            {showUnreadBadge && (
+                              <span
+                                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                                style={{ backgroundColor: colors.notify }}
+                              >
+                                {unreadCount > 99 ? "99+" : unreadCount}
+                              </span>
+                            )}
                             <span
                               className="shrink-0 text-[11px] font-semibold"
                               style={{
@@ -542,13 +555,15 @@ const GroupsSidebar = ({
                   ))
                 : filteredRooms.map((room) => {
                     const isActive = selectedRoomId === room.id;
+                    const unreadCount = unreadCounts[room.id] ?? 0;
+                    const showUnreadBadge = unreadCount > 0;
 
                     return (
                       <button
                         key={room.id}
                         type="button"
                         onClick={() => onSelectRoom(room.id)}
-                        className="grid h-16 w-16 cursor-pointer place-items-center overflow-hidden rounded-full border text-lg font-bold transition"
+                        className="relative grid h-16 w-16 cursor-pointer place-items-center overflow-hidden rounded-full border text-lg font-bold transition"
                         style={{
                           borderColor: isActive
                             ? `${colors.online}B3`
@@ -569,6 +584,15 @@ const GroupsSidebar = ({
                           />
                         ) : (
                           getRoomInitial(room.name)
+                        )}
+
+                        {showUnreadBadge && (
+                          <span
+                            className="absolute top-1 right-2 min-w-[1.1rem] rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                            style={{ backgroundColor: colors.notify }}
+                          >
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
                         )}
                       </button>
                     );

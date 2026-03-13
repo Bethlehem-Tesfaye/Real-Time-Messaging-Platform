@@ -44,11 +44,6 @@ const routes: RouteObject[] = [
     element: <ResetPasswordPage />,
   },
   {
-    path: "*",
-    element: <NotFound />,
-  },
-  // protected routes
-  {
     path: "/",
     element: <ProtectedLayout />,
     children: [
@@ -73,6 +68,10 @@ const routes: RouteObject[] = [
         element: <SettingsPage />,
       },
     ],
+  },
+  {
+    path: "*",
+    element: <NotFound />,
   },
 ];
 

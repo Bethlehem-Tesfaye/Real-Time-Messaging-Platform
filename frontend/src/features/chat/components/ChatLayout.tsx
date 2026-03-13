@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { colors } from "../../../config/theme";
-import { api } from "../../../lib/axios";
 import { connectSocket } from "../../../lib/socket";
+import { useMarkAllNotificationsRead } from "../../notification/hooks/useMarkAllNotificationsRead";
+import { useMarkNotificationRead } from "../../notification/hooks/useMarkNotificationRead";
+import { useNotifications } from "../../notification/hooks/useNotifications";
+import type { NotificationItem } from "../../notification/types/notification";
 import ChatMainPanel from "./ChatMainPanel";
 import ChatNavRail from "./ChatNavRail";
 import GroupsSidebar from "./GroupsSidebar";
@@ -12,17 +14,18 @@ import { useCreateRoom } from "../hooks/useCreateRoom";
 import { useDeleteRoom } from "../hooks/useDeleteRoom";
 import { useJoinRoom } from "../hooks/useJoinRoom";
 import { useLeaveRoom } from "../hooks/useLeaveRoom";
-import { useRoomMessages } from "../hooks/useRoomMessages";
 import { useRoomDetails } from "../hooks/useRoomDetails";
 import { useRoomMembership } from "../hooks/useRoomMembership";
+import { useRoomMessages } from "../hooks/useRoomMessages";
 import { useRooms } from "../hooks/useRooms";
+import { useSendRoomMessage } from "../hooks/useSendRoomMessage";
 import { useUpdateRoom } from "../hooks/useUpdateRoom";
-import type { ChatMessage, RoomMembershipResponse } from "../types/chat";
+import type { ChatMessage } from "../types/chat";
 
 type RoomFilterScope = "all" | "created" | "member";
+const EMPTY_MESSAGES: ChatMessage[] = [];
 
 const ChatLayout = () => {
-  const queryClient = useQueryClient();
   const [selectedRoomId, setSelectedRoomId] = useState<number | undefined>(
     undefined,
   );
@@ -35,6 +38,12 @@ const ChatLayout = () => {
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [messageInput, setMessageInput] = useState("");
   const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
+  const [liveNotifications, setLiveNotifications] = useState<
+    NotificationItem[]
+  >([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
+  const [targetMessageId, setTargetMessageId] = useState<number | null>(null);
 
   const { user } = useCurrentUser();
   const { data: rooms = [], isLoading: roomsLoading } = useRooms({
@@ -46,6 +55,9 @@ const ChatLayout = () => {
   const deleteRoomMutation = useDeleteRoom();
   const leaveRoomMutation = useLeaveRoom();
   const joinRoomMutation = useJoinRoom();
+  const sendRoomMessageMutation = useSendRoomMessage();
+  const markNotificationReadMutation = useMarkNotificationRead();
+  const markAllNotificationsReadMutation = useMarkAllNotificationsRead();
 
   const selectedRoom = useMemo(
     () => rooms.find((room) => room.id === selectedRoomId),
@@ -57,22 +69,57 @@ const ChatLayout = () => {
   const { data: membershipData, isLoading: membershipLoading } =
     useRoomMembership(selectedRoomId);
   const isMember = membershipData?.isMember === true;
-  const canJoin = membershipData ? !membershipData.isMember : false;
-  const { data: messageHistory = [], isLoading: messagesLoading } =
-    useRoomMessages(selectedRoomId, 100, isMember);
-  const shouldShowMessageSkeleton =
-    membershipLoading ||
-    joinRoomMutation.isPending ||
-    (isMember && messagesLoading);
+  const { data: messagesData, isLoading: messagesLoading } = useRoomMessages(
+    selectedRoomId,
+    100,
+    isMember,
+  );
+  const { data: notificationData = [] } = useNotifications({ limit: 30 });
+  const messages = messagesData ?? EMPTY_MESSAGES;
 
-  const mergeMessages = (messages: ChatMessage[]): ChatMessage[] => {
-    const dedup = new Map<number, ChatMessage>();
+  const unreadNotificationCount = useMemo(
+    () => liveNotifications.filter((notification) => !notification.read).length,
+    [liveNotifications],
+  );
 
-    messages.forEach((message) => {
-      dedup.set(message.id, message);
+  const unreadCounts = useMemo(() => {
+    return liveNotifications.reduce<Record<number, number>>(
+      (acc, notification) => {
+        const roomId = notification.data?.roomId;
+        if (notification.read || typeof roomId !== "number") {
+          return acc;
+        }
+
+        acc[roomId] = (acc[roomId] ?? 0) + 1;
+        return acc;
+      },
+      {},
+    );
+  }, [liveNotifications]);
+
+  const selectedRoomUnreadMessageIds = useMemo(() => {
+    if (!selectedRoomId) {
+      return [];
+    }
+
+    return liveNotifications
+      .filter(
+        (notification) =>
+          !notification.read &&
+          notification.data?.roomId === selectedRoomId &&
+          typeof notification.data?.messageId === "number",
+      )
+      .map((notification) => notification.data.messageId as number)
+      .sort((a, b) => a - b);
+  }, [liveNotifications, selectedRoomId]);
+
+  const mergeMessages = (items: ChatMessage[]) => {
+    const deduped = new Map<number, ChatMessage>();
+    items.forEach((message) => {
+      deduped.set(message.id, message);
     });
 
-    return Array.from(dedup.values()).sort(
+    return Array.from(deduped.values()).sort(
       (a, b) => +new Date(a.createdAt) - +new Date(b.createdAt),
     );
   };
@@ -105,41 +152,102 @@ const ChatLayout = () => {
   }, [rooms, selectedRoomId]);
 
   useEffect(() => {
-    setRoomMessages(messageHistory);
-  }, [messageHistory, selectedRoomId]);
+    setMessageInput("");
+  }, [selectedRoomId]);
 
   useEffect(() => {
-    if (!isMember) {
-      setRoomMessages([]);
-    }
-  }, [isMember, selectedRoomId]);
+    setLiveNotifications((previous) => {
+      const previousById = new Map(previous.map((item) => [item.id, item]));
+      const mergedById = new Map<number, NotificationItem>();
+
+      notificationData.forEach((item) => {
+        const previousItem = previousById.get(item.id);
+
+        mergedById.set(item.id, {
+          ...item,
+          read: item.read || previousItem?.read === true,
+        });
+      });
+
+      previous.forEach((item) => {
+        if (!mergedById.has(item.id)) {
+          mergedById.set(item.id, item);
+        }
+      });
+
+      return Array.from(mergedById.values()).sort(
+        (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+      );
+    });
+  }, [notificationData]);
 
   useEffect(() => {
     const socket = connectSocket();
+
+    const onReceiveNotification = (notification: NotificationItem) => {
+      setLiveNotifications((previous) => {
+        const deduped = new Map<number, NotificationItem>();
+
+        [notification, ...previous].forEach((item) => {
+          deduped.set(item.id, item);
+        });
+
+        return Array.from(deduped.values()).sort(
+          (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+        );
+      });
+    };
+
+    socket.on("receive_notification", onReceiveNotification);
+
+    return () => {
+      socket.off("receive_notification", onReceiveNotification);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMember) {
+      setRoomMessages((previous) => (previous.length === 0 ? previous : []));
+      return;
+    }
+
+    setRoomMessages((previous) => {
+      const next = mergeMessages(messages);
+
+      if (
+        previous.length === next.length &&
+        previous.every((item, index) => item.id === next[index]?.id)
+      ) {
+        return previous;
+      }
+
+      return next;
+    });
+  }, [isMember, messages, selectedRoomId]);
+
+  useEffect(() => {
+    if (!selectedRoomId || !isMember) {
+      return;
+    }
+
+    const socket = connectSocket();
+    socket.emit("join_room", { roomId: selectedRoomId });
 
     const onReceiveMessage = (message: ChatMessage) => {
       if (message.roomId !== selectedRoomId) {
         return;
       }
 
-      setRoomMessages((prev) => mergeMessages([...prev, message]));
+      setRoomMessages((previous) => mergeMessages([...previous, message]));
     };
 
     socket.on("receive_message", onReceiveMessage);
 
     return () => {
+      socket.emit("leave_room", { roomId: selectedRoomId });
       socket.off("receive_message", onReceiveMessage);
     };
-  }, [selectedRoomId]);
-
-  useEffect(() => {
-    if (!selectedRoomId) {
-      return;
-    }
-
-    const socket = connectSocket();
-    socket.emit("join_room", { roomId: selectedRoomId });
-  }, [selectedRoomId]);
+  }, [selectedRoomId, isMember]);
 
   const onCreateRoom = async (payload: {
     name: string;
@@ -153,48 +261,6 @@ const ChatLayout = () => {
     });
 
     setSelectedRoomId(createdRoom.id);
-  };
-
-  const onJoinSelectedRoom = async () => {
-    if (!selectedRoomId) {
-      return;
-    }
-
-    setRoomMessages([]);
-
-    await joinRoomMutation.mutateAsync(selectedRoomId);
-
-    queryClient.setQueryData<RoomMembershipResponse>(
-      ["room-membership", selectedRoomId],
-      {
-        roomId: selectedRoomId,
-        isMember: true,
-      },
-    );
-
-    await queryClient.invalidateQueries({
-      queryKey: ["room-membership", selectedRoomId],
-    });
-
-    const socket = connectSocket();
-    socket.emit("join_room", { roomId: selectedRoomId });
-
-    await queryClient.invalidateQueries({
-      queryKey: ["room-messages", selectedRoomId],
-    });
-
-    const { data: freshMessages } = await api.get<ChatMessage[]>(
-      `/api/messages/rooms/${selectedRoomId}`,
-      {
-        params: { limit: 100 },
-      },
-    );
-
-    queryClient.setQueryData(
-      ["room-messages", selectedRoomId, 100],
-      freshMessages,
-    );
-    setRoomMessages(freshMessages);
   };
 
   const onUpdateRoom = async (payload: {
@@ -213,45 +279,94 @@ const ChatLayout = () => {
 
   const onLeaveRoom = async (roomId: number) => {
     await leaveRoomMutation.mutateAsync(roomId);
-
-    const socket = connectSocket();
-    socket.emit("leave_room", { roomId });
-
-    if (selectedRoomId === roomId) {
-      setRoomMessages([]);
-      setMessageInput("");
-      await queryClient.invalidateQueries({
-        queryKey: ["room-membership", roomId],
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["room-messages", roomId],
-      });
-    }
   };
 
-  const onSelectRoom = (roomId: number) => {
-    setRoomMessages([]);
-    setMessageInput("");
-    setSelectedRoomId(roomId);
-    setIsMobileRoomsOpen(false);
-  };
-
-  const onSendMessage = () => {
+  const onJoinSelectedRoom = async () => {
     if (!selectedRoomId) {
       return;
     }
 
-    const content = messageInput.trim();
-    if (content.length === 0) {
+    await joinRoomMutation.mutateAsync(selectedRoomId);
+  };
+
+  const onSendMessage = async () => {
+    if (!selectedRoomId || !isMember || sendRoomMessageMutation.isPending) {
       return;
     }
 
-    const socket = connectSocket();
-    socket.emit("send_message", {
+    const content = messageInput.trim();
+    if (!content) {
+      return;
+    }
+
+    await sendRoomMessageMutation.mutateAsync({
       roomId: selectedRoomId,
       content,
     });
+    setScrollToBottomSignal((previous) => previous + 1);
     setMessageInput("");
+  };
+
+  const onSelectRoom = (roomId: number, clearTarget = true) => {
+    setSelectedRoomId(roomId);
+    setIsMobileRoomsOpen(false);
+
+    if (clearTarget) {
+      setTargetMessageId(null);
+    }
+  };
+
+  const onMarkAllNotificationsRead = async () => {
+    await markAllNotificationsReadMutation.mutateAsync();
+    setLiveNotifications((previous) =>
+      previous.map((notification) => ({ ...notification, read: true })),
+    );
+  };
+
+  const onNotificationClick = async (notification: NotificationItem) => {
+    const roomId = notification.data?.roomId;
+    const messageId = notification.data?.messageId;
+
+    if (typeof roomId === "number") {
+      onSelectRoom(roomId, false);
+    }
+
+    if (typeof messageId === "number") {
+      setTargetMessageId(messageId);
+    }
+
+    setNotificationsOpen(false);
+  };
+
+  const onMessagesRead = (messageIds: number[]) => {
+    if (!selectedRoomId || messageIds.length === 0) {
+      return;
+    }
+
+    const messageIdSet = new Set(messageIds);
+    const notificationsToMark = liveNotifications.filter(
+      (notification) =>
+        !notification.read &&
+        notification.data?.roomId === selectedRoomId &&
+        typeof notification.data?.messageId === "number" &&
+        messageIdSet.has(notification.data.messageId),
+    );
+
+    if (notificationsToMark.length === 0) {
+      return;
+    }
+
+    setLiveNotifications((previous) =>
+      previous.map((notification) =>
+        notificationsToMark.some((target) => target.id === notification.id)
+          ? { ...notification, read: true }
+          : notification,
+      ),
+    );
+
+    notificationsToMark.forEach((notification) => {
+      void markNotificationReadMutation.mutateAsync(notification.id);
+    });
   };
 
   return (
@@ -270,6 +385,7 @@ const ChatLayout = () => {
             rooms={rooms}
             roomsLoading={roomsLoading}
             selectedRoomId={selectedRoomId}
+            unreadCounts={unreadCounts}
             currentUserId={user?.id}
             activeTab={roomFilterScope}
             searchQuery={roomSearch}
@@ -291,17 +407,33 @@ const ChatLayout = () => {
 
         <ChatMainPanel
           selectedRoom={selectedRoom}
-          memberCount={roomLoading ? 0 : (roomDetails?.members.length ?? 0)}
-          memberCountLoading={roomLoading}
           messages={roomMessages}
-          messagesLoading={shouldShowMessageSkeleton}
+          unreadMessageIds={selectedRoomUnreadMessageIds}
+          messagesLoading={membershipLoading || (isMember && messagesLoading)}
           currentUserId={user?.id}
+          canJoin={membershipData ? !membershipData.isMember : false}
+          membershipLoading={membershipLoading}
+          onJoinRoom={onJoinSelectedRoom}
+          joiningRoom={joinRoomMutation.isPending}
           messageInput={messageInput}
           onMessageInputChange={setMessageInput}
           onSendMessage={onSendMessage}
-          canJoin={canJoin}
-          onJoinRoom={onJoinSelectedRoom}
-          joiningRoom={joinRoomMutation.isPending}
+          sendingMessage={sendRoomMessageMutation.isPending}
+          notifications={liveNotifications}
+          unreadNotificationCount={unreadNotificationCount}
+          notificationsOpen={notificationsOpen}
+          onToggleNotifications={() =>
+            setNotificationsOpen((previous) => !previous)
+          }
+          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+          onNotificationClick={onNotificationClick}
+          markingAllNotificationsRead={
+            markAllNotificationsReadMutation.isPending
+          }
+          forceScrollToBottomSignal={scrollToBottomSignal}
+          targetMessageId={targetMessageId}
+          onTargetMessageHandled={() => setTargetMessageId(null)}
+          onMessagesRead={onMessagesRead}
           onOpenRooms={() => {
             setIsMobileDetailsOpen(false);
             setIsMobileRoomsOpen(true);
@@ -348,6 +480,7 @@ const ChatLayout = () => {
             rooms={rooms}
             roomsLoading={roomsLoading}
             selectedRoomId={selectedRoomId}
+            unreadCounts={unreadCounts}
             currentUserId={user?.id}
             activeTab={roomFilterScope}
             searchQuery={roomSearch}

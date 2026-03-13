@@ -10,9 +10,12 @@ import {
   canUserAccessRoom,
   createMessageService
 } from "./modules/message/message.service";
+import type { NotificationItem } from "./modules/notification/types";
+import { createMessageNotificationsService } from "./modules/notification/notification.service";
 import type {
   JoinRoomSocketPayload,
   LeaveRoomSocketPayload,
+  MessageItem,
   SendMessageSocketPayload,
   SocketAck
 } from "./modules/message/types";
@@ -23,6 +26,12 @@ type SessionUser = {
 };
 
 const getRoomChannel = (roomId: number) => `room:${roomId}`;
+const getUserChannel = (userId: string) => `user:${userId}`;
+let ioInstance: Server | null = null;
+
+export const emitRoomMessage = (roomId: number, message: MessageItem) => {
+  ioInstance?.to(getRoomChannel(roomId)).emit("receive_message", message);
+};
 
 const initializeRedisAdapter = async (io: Server) => {
   const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
@@ -37,6 +46,30 @@ const initializeRedisAdapter = async (io: Server) => {
   logger.info("Socket.IO Redis adapter connected");
 };
 
+const initializeNotificationSubscriber = async (io: Server) => {
+  const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+  const subscriberClient = createClient({ url: redisUrl });
+
+  await subscriberClient.connect();
+
+  await subscriberClient.pSubscribe("notifications:*", (message, channel) => {
+    const userId = channel.replace("notifications:", "").trim();
+
+    if (!userId) {
+      return;
+    }
+
+    try {
+      const notification = JSON.parse(message) as NotificationItem;
+      io.to(getUserChannel(userId)).emit("receive_notification", notification);
+    } catch (err) {
+      logger.warn({ err }, "Failed to parse notification payload");
+    }
+  });
+
+  logger.info("Notification Redis subscriber connected");
+};
+
 export const registerSocketServer = (httpServer: HttpServer) => {
   const io = new Server(httpServer, {
     cors: {
@@ -48,11 +81,19 @@ export const registerSocketServer = (httpServer: HttpServer) => {
       credentials: true
     }
   });
+  ioInstance = io;
 
   void initializeRedisAdapter(io).catch((err) => {
     logger.warn(
       { err },
       "Socket.IO Redis adapter unavailable; running single-node"
+    );
+  });
+
+  void initializeNotificationSubscriber(io).catch((err) => {
+    logger.warn(
+      { err },
+      "Notification Redis subscriber unavailable; realtime notifications disabled"
     );
   });
 
@@ -90,6 +131,8 @@ export const registerSocketServer = (httpServer: HttpServer) => {
   });
 
   io.on("connection", (socket) => {
+    socket.join(getUserChannel(socket.data.userId));
+
     logger.info(
       { socketId: socket.id, userId: socket.data.userId },
       "Socket connected"
@@ -169,6 +212,14 @@ export const registerSocketServer = (httpServer: HttpServer) => {
             roomId,
             content
           );
+
+          await createMessageNotificationsService({
+            senderId: createdMessage.senderId,
+            senderName: createdMessage.senderName,
+            roomId: createdMessage.roomId,
+            messageId: createdMessage.id,
+            content: createdMessage.content
+          });
 
           io.to(getRoomChannel(roomId)).emit("receive_message", createdMessage);
           ack?.({ ok: true });

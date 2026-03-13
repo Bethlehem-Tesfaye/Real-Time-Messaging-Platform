@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { RoomMessagesParams, RoomMessagesQuery } from "./types";
+import type {
+  CreateRoomMessageBody,
+  RoomMessagesParams,
+  RoomMessagesQuery
+} from "./types";
 
 export const roomMessagesParamsSchema: z.ZodType<RoomMessagesParams> = z.object(
   {
@@ -13,3 +17,8 @@ export const roomMessagesParamsSchema: z.ZodType<RoomMessagesParams> = z.object(
 export const roomMessagesQuerySchema: z.ZodType<RoomMessagesQuery> = z.object({
   limit: z.string().regex(/^\d+$/, "Limit must be a valid number").optional()
 });
+
+export const createRoomMessageBodySchema: z.ZodType<CreateRoomMessageBody> =
+  z.object({
+    content: z.string().trim().min(1, "Message content is required")
+  });

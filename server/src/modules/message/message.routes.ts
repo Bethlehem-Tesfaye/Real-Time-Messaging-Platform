@@ -1,8 +1,12 @@
 import { Router } from "express";
 import authMiddleware from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validate";
-import { listRoomMessagesController } from "./message.controller";
 import {
+  createRoomMessageController,
+  listRoomMessagesController
+} from "./message.controller";
+import {
+  createRoomMessageBodySchema,
   roomMessagesParamsSchema,
   roomMessagesQuerySchema
 } from "./message.schema";
@@ -15,6 +19,13 @@ messageRouter.get(
   validate(roomMessagesParamsSchema, "params"),
   validate(roomMessagesQuerySchema, "query"),
   listRoomMessagesController
+);
+
+messageRouter.post(
+  "/rooms/:roomId",
+  validate(roomMessagesParamsSchema, "params"),
+  validate(createRoomMessageBodySchema, "body"),
+  createRoomMessageController
 );
 
 export default messageRouter;
