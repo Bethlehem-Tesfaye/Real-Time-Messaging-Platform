@@ -41,3 +41,13 @@ export type RoomMembershipResponse = {
   roomId: number;
   isMember: boolean;
 };
+
+export type ChatMessage = {
+  id: number;
+  content: string;
+  senderId: string;
+  senderName: string;
+  senderAvatarUrl: string | null;
+  roomId: number;
+  createdAt: string;
+};

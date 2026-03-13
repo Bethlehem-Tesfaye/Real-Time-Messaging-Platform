@@ -40,7 +40,7 @@ const ProtectedLayout: React.FC = () => {
     return <Navigate to="/profile" replace />;
   }
 
-  return <Outlet />;
+  return <Outlet key={location.pathname} />;
 };
 
 export default ProtectedLayout;

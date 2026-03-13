@@ -1,23 +1,64 @@
 import { MessageCircle, Send } from "lucide-react";
 import { colors } from "../../../config/theme";
-import type { RoomListItem } from "../types/chat";
+import NotificationBell from "../../notification/components/NotificationBell";
+import type { NotificationItem } from "../../notification/types/notification";
+import MessageList from "./MessageList";
+import type { ChatMessage, RoomListItem } from "../types/chat";
 
 type ChatMainPanelProps = {
   selectedRoom?: RoomListItem;
+  messages: ChatMessage[];
+  unreadMessageIds: number[];
+  messagesLoading: boolean;
+  currentUserId?: string;
   canJoin: boolean;
   membershipLoading: boolean;
   onJoinRoom: () => void;
   joiningRoom: boolean;
+  messageInput: string;
+  onMessageInputChange: (value: string) => void;
+  onSendMessage: () => void;
+  sendingMessage: boolean;
+  notifications: NotificationItem[];
+  unreadNotificationCount: number;
+  notificationsOpen: boolean;
+  onToggleNotifications: () => void;
+  onMarkAllNotificationsRead: () => void;
+  onNotificationClick: (notification: NotificationItem) => void;
+  markingAllNotificationsRead: boolean;
+  forceScrollToBottomSignal?: number;
+  targetMessageId?: number | null;
+  onTargetMessageHandled?: () => void;
+  onMessagesRead?: (messageIds: number[]) => void;
   onOpenRooms?: () => void;
   onOpenDetails?: () => void;
 };
 
 const ChatMainPanel = ({
   selectedRoom,
+  messages,
+  unreadMessageIds,
+  messagesLoading,
+  currentUserId,
   canJoin,
   membershipLoading,
   onJoinRoom,
   joiningRoom,
+  messageInput,
+  onMessageInputChange,
+  onSendMessage,
+  sendingMessage,
+  notifications,
+  unreadNotificationCount,
+  notificationsOpen,
+  onToggleNotifications,
+  onMarkAllNotificationsRead,
+  onNotificationClick,
+  markingAllNotificationsRead,
+  forceScrollToBottomSignal,
+  targetMessageId,
+  onTargetMessageHandled,
+  onMessagesRead,
   onOpenRooms,
   onOpenDetails,
 }: ChatMainPanelProps) => {
@@ -105,42 +146,32 @@ const ChatMainPanel = ({
           >
             Participants
           </div>
-          {!membershipLoading && canJoin && (
-            <button
-              type="button"
-              onClick={onJoinRoom}
-              disabled={joiningRoom}
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 xl:px-5 xl:text-[0.95rem]"
-              style={{ backgroundColor: colors.secondary }}
-            >
-              {joiningRoom ? "Joining..." : "Join"}
-            </button>
-          )}
+          <NotificationBell
+            notifications={notifications}
+            unreadCount={unreadNotificationCount}
+            open={notificationsOpen}
+            onToggle={onToggleNotifications}
+            onMarkAllRead={onMarkAllNotificationsRead}
+            onNotificationClick={onNotificationClick}
+            markingAllRead={markingAllNotificationsRead}
+          />
         </div>
       </header>
 
-      <section className="relative flex-1 p-6">
-        <div className="space-y-4">
-          <div
-            className="max-w-[68%] rounded-2xl bg-white px-4 py-3 text-sm shadow-sm xl:text-[0.96rem]"
-            style={{ color: colors.primary }}
-          >
-            Messages area placeholder — real-time conversation UI goes here.
-          </div>
-          <div
-            className="ml-auto max-w-[60%] rounded-2xl px-4 py-3 text-sm text-white shadow-sm xl:text-[0.96rem]"
-            style={{ backgroundColor: `${colors.secondary}CC` }}
-          >
-            Keep this center panel structure for incoming/outgoing messages.
-          </div>
-          <div
-            className="max-w-[55%] rounded-2xl bg-white px-4 py-3 text-sm shadow-sm xl:text-[0.96rem]"
-            style={{ color: colors.primary }}
-          >
-            You can now focus on socket events and message persistence next.
-          </div>
-        </div>
-      </section>
+      <MessageList
+        roomId={selectedRoom.id}
+        messages={messages}
+        currentUserId={currentUserId}
+        loading={messagesLoading}
+        showJoinPrompt={canJoin}
+        joinLoading={joiningRoom || membershipLoading}
+        onJoinRoom={onJoinRoom}
+        unreadMessageIds={unreadMessageIds}
+        forceScrollToBottomSignal={forceScrollToBottomSignal}
+        targetMessageId={targetMessageId}
+        onTargetMessageHandled={onTargetMessageHandled}
+        onMessagesRead={onMessagesRead}
+      />
 
       <footer
         className="border-t px-5 py-4"
@@ -155,14 +186,25 @@ const ChatMainPanel = ({
             style={{ color: colors.secondary }}
           />
           <input
-            disabled
+            value={messageInput}
+            onChange={(event) => onMessageInputChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSendMessage();
+              }
+            }}
+            disabled={canJoin || sendingMessage}
             placeholder="Write your message..."
             className="w-full bg-transparent text-sm outline-none xl:text-[0.95rem]"
             style={{ color: colors.primary }}
           />
           <button
             type="button"
-            disabled
+            onClick={onSendMessage}
+            disabled={
+              canJoin || sendingMessage || messageInput.trim().length === 0
+            }
             className="grid h-9 w-9 place-items-center rounded-xl text-white"
             style={{ backgroundColor: colors.online }}
           >

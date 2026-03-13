@@ -15,6 +15,7 @@ type GroupsSidebarProps = {
   rooms: RoomListItem[];
   roomsLoading: boolean;
   selectedRoomId?: number;
+  unreadCounts: Record<number, number>;
   currentUserId?: string;
   activeTab: RoomTab;
   searchQuery: string;
@@ -47,6 +48,7 @@ const GroupsSidebar = ({
   rooms,
   roomsLoading,
   selectedRoomId,
+  unreadCounts,
   currentUserId,
   activeTab,
   searchQuery,
@@ -212,8 +214,8 @@ const GroupsSidebar = ({
 
   const handleLeaveRoom = async (roomId: number) => {
     setOpenMenuRoomId(null);
-    await onLeaveRoom(roomId);
     setConfirmLeaveRoom(null);
+    await onLeaveRoom(roomId);
   };
 
   return (
@@ -277,7 +279,7 @@ const GroupsSidebar = ({
             <button
               type="button"
               onClick={() => onTabChange("all")}
-              className="h-9 rounded-xl text-xs font-semibold transition"
+              className="h-9 cursor-pointer rounded-xl text-xs font-semibold transition"
               style={{
                 color: activeTab === "all" ? colors.primary : colors.secondary,
                 border: `1px solid ${
@@ -294,7 +296,7 @@ const GroupsSidebar = ({
             <button
               type="button"
               onClick={() => onTabChange("created")}
-              className="h-9 rounded-xl text-xs font-semibold transition"
+              className="h-9 cursor-pointer rounded-xl text-xs font-semibold transition"
               style={{
                 color:
                   activeTab === "created" ? colors.primary : colors.secondary,
@@ -312,7 +314,7 @@ const GroupsSidebar = ({
             <button
               type="button"
               onClick={() => onTabChange("member")}
-              className="h-9 rounded-xl text-xs font-semibold transition"
+              className="h-9 cursor-pointer rounded-xl text-xs font-semibold transition"
               style={{
                 color:
                   activeTab === "member" ? colors.primary : colors.secondary,
@@ -343,9 +345,38 @@ const GroupsSidebar = ({
 
           <div className="mt-5 min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1">
             {roomsLoading ? (
-              <p className="text-sm" style={{ color: colors.secondary }}>
-                Loading groups...
-              </p>
+              <div className="space-y-2.5 animate-pulse">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={`room-skeleton-${index}`}
+                    className="w-full rounded-2xl border px-3 py-3"
+                    style={{
+                      borderColor: `${colors.secondary}20`,
+                      backgroundColor: `${colors.bg}4D`,
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-10 w-10 shrink-0 rounded-full"
+                        style={{ backgroundColor: `${colors.secondary}22` }}
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div
+                            className="h-4 w-[60%] rounded"
+                            style={{ backgroundColor: `${colors.secondary}22` }}
+                          />
+                          <div
+                            className="h-4 w-12 rounded"
+                            style={{ backgroundColor: `${colors.secondary}1A` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : filteredRooms.length === 0 ? (
               <p className="text-sm" style={{ color: colors.secondary }}>
                 {activeTab === "created"
@@ -358,12 +389,15 @@ const GroupsSidebar = ({
               filteredRooms.map((room) => {
                 const isActive = selectedRoomId === room.id;
                 const isOwner = currentUserId === room.ownerId;
+                const unreadCount = unreadCounts[room.id] ?? 0;
+                const showUnreadBadge = unreadCount > 0;
+
                 return (
                   <button
                     key={room.id}
                     type="button"
                     onClick={() => onSelectRoom(room.id)}
-                    className="w-full rounded-2xl border px-3 py-3 text-left transition"
+                    className="w-full cursor-pointer rounded-2xl border px-3 py-3 text-left transition"
                     style={{
                       borderColor: isActive
                         ? `${colors.online}80`
@@ -400,6 +434,14 @@ const GroupsSidebar = ({
                             <span className="truncate text-[1.08rem] font-semibold xl:text-[1.16rem]">
                               {room.name}
                             </span>
+                            {showUnreadBadge && (
+                              <span
+                                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                                style={{ backgroundColor: colors.notify }}
+                              >
+                                {unreadCount > 99 ? "99+" : unreadCount}
+                              </span>
+                            )}
                             <span
                               className="shrink-0 text-[11px] font-semibold"
                               style={{
@@ -421,7 +463,7 @@ const GroupsSidebar = ({
                                   prev === room.id ? null : room.id,
                                 );
                               }}
-                              className="grid h-8 w-8 place-items-center rounded-lg"
+                              className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg"
                               style={{
                                 backgroundColor: `${colors.secondary}14`,
                                 color: colors.primary,
@@ -503,39 +545,58 @@ const GroupsSidebar = ({
         >
           <div className="h-full overflow-y-auto scrollbar-thin">
             <div className="flex flex-col items-center gap-2.5">
-              {filteredRooms.map((room) => {
-                const isActive = selectedRoomId === room.id;
+              {roomsLoading
+                ? Array.from({ length: 6 }).map((_, index) => (
+                    <div
+                      key={`collapsed-room-skeleton-${index}`}
+                      className="h-16 w-16 animate-pulse rounded-full"
+                      style={{ backgroundColor: `${colors.secondary}22` }}
+                    />
+                  ))
+                : filteredRooms.map((room) => {
+                    const isActive = selectedRoomId === room.id;
+                    const unreadCount = unreadCounts[room.id] ?? 0;
+                    const showUnreadBadge = unreadCount > 0;
 
-                return (
-                  <button
-                    key={room.id}
-                    type="button"
-                    onClick={() => onSelectRoom(room.id)}
-                    className="grid h-16 w-16 place-items-center overflow-hidden rounded-full border text-lg font-bold transition"
-                    style={{
-                      borderColor: isActive
-                        ? `${colors.online}B3`
-                        : `${colors.secondary}33`,
-                      backgroundColor: isActive
-                        ? `${colors.online}22`
-                        : `${colors.bg}80`,
-                      color: colors.primary,
-                    }}
-                    title={room.name}
-                    aria-label={room.name}
-                  >
-                    {room.avatarUrl ? (
-                      <img
-                        src={room.avatarUrl}
-                        alt={`${room.name} avatar`}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      getRoomInitial(room.name)
-                    )}
-                  </button>
-                );
-              })}
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => onSelectRoom(room.id)}
+                        className="relative grid h-16 w-16 cursor-pointer place-items-center overflow-hidden rounded-full border text-lg font-bold transition"
+                        style={{
+                          borderColor: isActive
+                            ? `${colors.online}B3`
+                            : `${colors.secondary}33`,
+                          backgroundColor: isActive
+                            ? `${colors.online}22`
+                            : `${colors.bg}80`,
+                          color: colors.primary,
+                        }}
+                        title={room.name}
+                        aria-label={room.name}
+                      >
+                        {room.avatarUrl ? (
+                          <img
+                            src={room.avatarUrl}
+                            alt={`${room.name} avatar`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          getRoomInitial(room.name)
+                        )}
+
+                        {showUnreadBadge && (
+                          <span
+                            className="absolute top-1 right-2 min-w-[1.1rem] rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                            style={{ backgroundColor: colors.notify }}
+                          >
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
             </div>
           </div>
         </div>
@@ -829,7 +890,7 @@ const GroupsSidebar = ({
       <button
         type="button"
         onClick={() => setShowCreateBox((prev) => !prev)}
-        className={`absolute bottom-4 grid h-11 w-11 place-items-center rounded-full text-white shadow-md transition-all duration-300 ease-in-out ${
+        className={`absolute bottom-4 grid h-11 w-11 place-items-center rounded-full cursor-pointer text-white shadow-md transition-all duration-300 ease-in-out ${
           collapsed ? "left-1/2 -translate-x-1/2" : "right-4"
         }`}
         style={{ backgroundColor: colors.online }}

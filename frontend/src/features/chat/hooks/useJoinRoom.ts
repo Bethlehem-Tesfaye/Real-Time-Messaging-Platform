@@ -29,6 +29,8 @@ export const useJoinRoom = () => {
     onSuccess: (response, roomId) => {
       queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ["room", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["room-membership", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["room-messages", roomId] });
       toast.success(response.message || "Joined room successfully");
     },
     onError: (error) => {
