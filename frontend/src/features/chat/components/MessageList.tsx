@@ -9,6 +9,8 @@ type MessageListProps = {
   currentUserId?: string;
   loading: boolean;
   showJoinPrompt: boolean;
+  joinLoading?: boolean;
+  onJoinRoom?: () => void;
   unreadMessageIds?: number[];
   forceScrollToBottomSignal?: number;
   targetMessageId?: number | null;
@@ -22,6 +24,8 @@ const MessageList = ({
   currentUserId,
   loading,
   showJoinPrompt,
+  joinLoading = false,
+  onJoinRoom,
   unreadMessageIds = [],
   forceScrollToBottomSignal,
   targetMessageId,
@@ -297,8 +301,50 @@ const MessageList = ({
 
   if (loading) {
     return (
-      <section className="relative flex-1 p-6">
-        <p style={{ color: colors.secondary }}>Loading messages...</p>
+      <section className="relative flex-1 min-h-0 overflow-hidden p-4 sm:p-6">
+        <div className="space-y-4 animate-pulse">
+          {Array.from({ length: 7 }).map((_, index) => {
+            const mine = index % 3 === 0;
+
+            return (
+              <div
+                key={`message-skeleton-${index}`}
+                className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}
+              >
+                {!mine && (
+                  <div
+                    className="h-8 w-8 shrink-0 rounded-full"
+                    style={{ backgroundColor: `${colors.secondary}22` }}
+                  />
+                )}
+
+                <div
+                  className={`rounded-2xl px-3 py-2 ${mine ? "w-[58%] sm:w-[46%]" : "w-[66%] sm:w-[52%]"}`}
+                  style={{
+                    backgroundColor: mine
+                      ? `${colors.secondary}22`
+                      : `${colors.secondary}14`,
+                  }}
+                >
+                  {!mine && (
+                    <div
+                      className="mb-2 h-3 w-24 rounded"
+                      style={{ backgroundColor: `${colors.secondary}22` }}
+                    />
+                  )}
+                  <div
+                    className="h-3 w-[88%] rounded"
+                    style={{ backgroundColor: `${colors.secondary}22` }}
+                  />
+                  <div
+                    className="mt-2 h-3 w-[62%] rounded"
+                    style={{ backgroundColor: `${colors.secondary}1A` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
     );
   }
@@ -307,9 +353,23 @@ const MessageList = ({
     return (
       <section className="relative flex-1 p-6">
         <div className="grid h-full place-items-center">
-          <p className="text-sm" style={{ color: colors.secondary }}>
-            Join this room to view message history.
-          </p>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p
+              className="text-sm font-medium"
+              style={{ color: colors.secondary }}
+            >
+              Join to see and send messages.
+            </p>
+            <button
+              type="button"
+              onClick={onJoinRoom}
+              disabled={joinLoading || !onJoinRoom}
+              className="rounded-xl px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              style={{ backgroundColor: colors.secondary }}
+            >
+              {joinLoading ? "Joining..." : "Join Room"}
+            </button>
+          </div>
         </div>
       </section>
     );

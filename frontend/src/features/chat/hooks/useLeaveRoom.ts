@@ -2,7 +2,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { api } from "../../../lib/axios";
-import type { RoomActionResponse, RoomListItem } from "../types/chat";
+import type {
+  RoomActionResponse,
+  RoomListItem,
+  RoomMembershipResponse,
+} from "../types/chat";
 import { ROOMS_QUERY_KEY } from "./useRooms";
 
 const getErrorMessage = (error: unknown): string => {
@@ -32,8 +36,17 @@ export const useLeaveRoom = () => {
         (currentRooms = []) =>
           currentRooms.filter((room) => room.id !== roomId),
       );
+      queryClient.setQueryData<RoomMembershipResponse>(
+        ["room-membership", roomId],
+        {
+          roomId,
+          isMember: false,
+        },
+      );
       queryClient.removeQueries({ queryKey: ["room", roomId] });
       queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["room-membership", roomId] });
+      queryClient.removeQueries({ queryKey: ["room-messages", roomId] });
       toast.success(response.message || "Left room successfully");
     },
     onError: (error) => {

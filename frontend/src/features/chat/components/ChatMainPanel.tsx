@@ -146,18 +146,6 @@ const ChatMainPanel = ({
           >
             Participants
           </div>
-          {!membershipLoading && canJoin && (
-            <button
-              type="button"
-              onClick={onJoinRoom}
-              disabled={joiningRoom}
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 xl:px-5 xl:text-[0.95rem]"
-              style={{ backgroundColor: colors.secondary }}
-            >
-              {joiningRoom ? "Joining..." : "Join"}
-            </button>
-          )}
-
           <NotificationBell
             notifications={notifications}
             unreadCount={unreadNotificationCount}
@@ -176,6 +164,8 @@ const ChatMainPanel = ({
         currentUserId={currentUserId}
         loading={messagesLoading}
         showJoinPrompt={canJoin}
+        joinLoading={joiningRoom || membershipLoading}
+        onJoinRoom={onJoinRoom}
         unreadMessageIds={unreadMessageIds}
         forceScrollToBottomSignal={forceScrollToBottomSignal}
         targetMessageId={targetMessageId}
