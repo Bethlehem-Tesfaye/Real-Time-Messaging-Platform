@@ -2,7 +2,10 @@ import { createClient } from "redis";
 import { logger } from "../config/logger";
 
 const redisClient = createClient({
-  url: process.env.REDIS_URL || "redis://localhost:6379"
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+  socket: {
+    tls: true
+  }
 });
 
 redisClient.on("error", (err) => logger.error({ err }, "Redis error"));
