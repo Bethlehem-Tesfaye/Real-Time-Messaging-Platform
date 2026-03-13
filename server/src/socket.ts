@@ -83,14 +83,14 @@ export const registerSocketServer = (httpServer: HttpServer) => {
   });
   ioInstance = io;
 
-  void initializeRedisAdapter(io).catch((err) => {
+  initializeRedisAdapter(io).catch((err) => {
     logger.warn(
       { err },
       "Socket.IO Redis adapter unavailable; running single-node"
     );
   });
 
-  void initializeNotificationSubscriber(io).catch((err) => {
+  initializeNotificationSubscriber(io).catch((err) => {
     logger.warn(
       { err },
       "Notification Redis subscriber unavailable; realtime notifications disabled"
@@ -120,8 +120,12 @@ export const registerSocketServer = (httpServer: HttpServer) => {
         return next(new Error("Unauthorized socket connection"));
       }
 
-      socket.data.userId = session.user.id;
-      socket.data.userName = session.user.name ?? "Unknown";
+      const socketData = socket.data as {
+        userId?: string;
+        userName?: string;
+      };
+      socketData.userId = session.user.id;
+      socketData.userName = session.user.name ?? "Unknown";
 
       return next();
     } catch (err) {
