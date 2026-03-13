@@ -1,0 +1,2 @@
+ALTER TABLE "rooms"
+ADD COLUMN "avatar_url" TEXT;

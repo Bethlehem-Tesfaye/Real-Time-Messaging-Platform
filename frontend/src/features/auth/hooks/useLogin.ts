@@ -2,6 +2,8 @@ import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 import { authClient } from "../../../lib/authClient";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { api } from "../../../lib/axios";
+import type { ProfileApiResponse } from "../../profile/types/profile";
 
 interface LoginInput {
   email: string;
@@ -40,7 +42,19 @@ export const useLogin = (): UseLoginResult => {
       },
       onSuccess: (data) => {
         toast.success(`Welcome back, ${data.user.email}!`);
-        navigate("/dashboard");
+        void (async () => {
+          try {
+            const profileRes =
+              await api.get<ProfileApiResponse>("/api/profile/me");
+            if (profileRes.data.data.isComplete) {
+              navigate("/chat");
+            } else {
+              navigate("/profile");
+            }
+          } catch {
+            navigate("/profile");
+          }
+        })();
       },
       onError: (error: Error) => {
         toast.error(error.message || "Login failed, try again");

@@ -51,7 +51,7 @@ export const useRegister = (): UseRegisterResult => {
         return res.data; // { user, session? }
       },
       onSuccess: (data) => {
-        toast.success(`Welcome, ${data.user.email}! Please verify your email.`);
+        toast.success(`Welcome, ${data.user.email}!`);
         navigate("/verify-notice");
       },
       onError: (error: Error) => {

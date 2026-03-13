@@ -9,7 +9,13 @@ export const validate =
   (req: Request, _res: Response, next: NextFunction) => {
     try {
       const data = req[target];
-      schema.parse(data);
+      const parsedData = schema.parse(data);
+
+      if (target === "body" || target === "params") {
+        (req as unknown as Record<"body" | "params", unknown>)[target] =
+          parsedData;
+      }
+
       next();
     } catch (err) {
       if (err instanceof z.ZodError) {
