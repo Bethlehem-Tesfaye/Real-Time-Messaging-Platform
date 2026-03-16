@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { colors } from "../../../config/theme";
 import type { ChatMessage } from "../types/chat";
 
@@ -16,6 +16,7 @@ type MessageListProps = {
   targetMessageId?: number | null;
   onTargetMessageHandled?: () => void;
   onMessagesRead?: (messageIds: number[]) => void;
+  onRetryMessage?: (localId: string) => void;
 };
 
 const MessageList = ({
@@ -31,6 +32,7 @@ const MessageList = ({
   targetMessageId,
   onTargetMessageHandled,
   onMessagesRead,
+  onRetryMessage,
 }: MessageListProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const messageRefs = useRef(new Map<number, HTMLDivElement>());
@@ -396,6 +398,9 @@ const MessageList = ({
         <div className="space-y-4">
           {sortedMessages.map((message) => {
             const mine = message.senderId === currentUserId;
+            const isPending = message.deliveryStatus === "pending";
+            const isError = message.deliveryStatus === "error";
+            const localId = message.localId;
             const senderInitial =
               message.senderName.trim().charAt(0).toUpperCase() || "U";
 
@@ -453,12 +458,15 @@ const MessageList = ({
                   )}
 
                   <div
-                    className={`max-w-[80%] rounded-2xl px-3 py-2 sm:max-w-[70%] ${mine ? "text-white" : "bg-white"}`}
+                    className={`max-w-[80%] rounded-2xl border px-3 py-2 sm:max-w-[70%] ${mine ? "text-white" : "bg-white"} ${isPending ? "opacity-70" : ""}`}
                     style={{
                       backgroundColor: mine
                         ? `${colors.secondary}CC`
                         : "#FFFFFF",
                       color: mine ? "#FFFFFF" : colors.primary,
+                      borderColor: isError
+                        ? `${colors.notify}66`
+                        : "transparent",
                     }}
                   >
                     {!mine && (
@@ -470,12 +478,40 @@ const MessageList = ({
                       </p>
                     )}
                     <p className="text-sm">{message.content}</p>
-                    <p className="mt-1 text-[10px] opacity-70">
-                      {new Date(message.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="text-[10px] opacity-70">
+                        {new Date(message.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+
+                      {mine && isPending && (
+                        <span className="inline-flex items-center gap-1 text-[10px] opacity-90">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Sending
+                        </span>
+                      )}
+
+                      {mine && isError && (
+                        <div className="inline-flex items-center gap-2 text-[10px]">
+                          <span style={{ color: colors.notify }}>Failed</span>
+                          {localId && onRetryMessage && (
+                            <button
+                              type="button"
+                              onClick={() => onRetryMessage(localId)}
+                              className="rounded px-1.5 py-0.5 font-semibold"
+                              style={{
+                                backgroundColor: `${colors.notify}22`,
+                                color: colors.notify,
+                              }}
+                            >
+                              Retry
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

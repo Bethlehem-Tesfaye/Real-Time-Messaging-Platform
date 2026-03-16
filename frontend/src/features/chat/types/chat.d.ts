@@ -50,4 +50,6 @@ export type ChatMessage = {
   senderAvatarUrl: string | null;
   roomId: number;
   createdAt: string;
+  localId?: string;
+  deliveryStatus?: "pending" | "sent" | "error";
 };

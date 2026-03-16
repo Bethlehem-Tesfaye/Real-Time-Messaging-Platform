@@ -1,11 +1,10 @@
 import { createClient } from "redis";
 import { logger } from "../config/logger";
 
+const isProduction = process.env.NODE_ENV === "production";
 const redisClient = createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
-  socket: {
-    tls: true
-  }
+  ...(isProduction ? { tls: {} } : {})
 });
 
 redisClient.on("error", (err) => logger.error({ err }, "Redis error"));

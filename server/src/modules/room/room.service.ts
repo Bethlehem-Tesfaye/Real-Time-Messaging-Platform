@@ -72,6 +72,9 @@ export const listRoomsService = async (
       if (cachedRooms) {
         try {
           publicRooms = JSON.parse(cachedRooms) as RoomListItem[];
+          logger.info(
+            `Rooms fetched from Redis cache (${publicRooms.length} rooms ${cachedRooms} )`
+          );
         } catch {
           await redisClient.del(CACHE_KEYS.ROOMS_LIST);
         }
