@@ -18,7 +18,7 @@ type ChatMainPanelProps = {
   messageInput: string;
   onMessageInputChange: (value: string) => void;
   onSendMessage: () => void;
-  sendingMessage: boolean;
+  onRetryMessage: (localId: string) => void;
   notifications: NotificationItem[];
   unreadNotificationCount: number;
   notificationsOpen: boolean;
@@ -47,7 +47,7 @@ const ChatMainPanel = ({
   messageInput,
   onMessageInputChange,
   onSendMessage,
-  sendingMessage,
+  onRetryMessage,
   notifications,
   unreadNotificationCount,
   notificationsOpen,
@@ -171,6 +171,7 @@ const ChatMainPanel = ({
         targetMessageId={targetMessageId}
         onTargetMessageHandled={onTargetMessageHandled}
         onMessagesRead={onMessagesRead}
+        onRetryMessage={onRetryMessage}
       />
 
       <footer
@@ -194,7 +195,7 @@ const ChatMainPanel = ({
                 onSendMessage();
               }
             }}
-            disabled={canJoin || sendingMessage}
+            disabled={canJoin}
             placeholder="Write your message..."
             className="w-full bg-transparent text-sm outline-none xl:text-[0.95rem]"
             style={{ color: colors.primary }}
@@ -202,9 +203,7 @@ const ChatMainPanel = ({
           <button
             type="button"
             onClick={onSendMessage}
-            disabled={
-              canJoin || sendingMessage || messageInput.trim().length === 0
-            }
+            disabled={canJoin || messageInput.trim().length === 0}
             className="grid h-9 w-9 place-items-center rounded-xl text-white"
             style={{ backgroundColor: colors.online }}
           >

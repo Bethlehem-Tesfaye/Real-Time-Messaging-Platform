@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { api } from "../../../lib/axios";
@@ -7,6 +7,7 @@ import type { ChatMessage } from "../types/chat";
 type SendRoomMessageInput = {
   roomId: number;
   content: string;
+  localId?: string;
 };
 
 const getErrorMessage = (error: unknown): string => {
@@ -21,8 +22,6 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 export const useSendRoomMessage = () => {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({ roomId, content }: SendRoomMessageInput) => {
       const { data } = await api.post<ChatMessage>(
@@ -32,26 +31,6 @@ export const useSendRoomMessage = () => {
         },
       );
       return data;
-    },
-    onSuccess: (createdMessage, variables) => {
-      queryClient.setQueryData<ChatMessage[]>(
-        ["room-messages", variables.roomId, 100],
-        (previous = []) => {
-          const next = [...previous, createdMessage];
-          const deduped = new Map<number, ChatMessage>();
-
-          next.forEach((message) => {
-            deduped.set(message.id, message);
-          });
-
-          return Array.from(deduped.values()).sort(
-            (a, b) => +new Date(a.createdAt) - +new Date(b.createdAt),
-          );
-        },
-      );
-      queryClient.invalidateQueries({
-        queryKey: ["room-messages", variables.roomId],
-      });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

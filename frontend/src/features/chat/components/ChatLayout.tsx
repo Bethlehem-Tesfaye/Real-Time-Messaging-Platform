@@ -124,6 +124,47 @@ const ChatLayout = () => {
     );
   };
 
+  const updateMessageDeliveryStatus = (
+    localId: string,
+    deliveryStatus: "pending" | "error",
+  ) => {
+    setRoomMessages((previous) =>
+      previous.map((message) =>
+        message.localId === localId ? { ...message, deliveryStatus } : message,
+      ),
+    );
+  };
+
+  const sendOptimisticMessage = async (params: {
+    roomId: number;
+    localId: string;
+    content: string;
+  }) => {
+    try {
+      const createdMessage = await sendRoomMessageMutation.mutateAsync({
+        roomId: params.roomId,
+        content: params.content,
+        localId: params.localId,
+      });
+
+      setRoomMessages((previous) => {
+        const replaced = previous.map((message) =>
+          message.localId === params.localId
+            ? {
+                ...createdMessage,
+                localId: params.localId,
+                deliveryStatus: "sent" as const,
+              }
+            : message,
+        );
+
+        return mergeMessages(replaced);
+      });
+    } catch {
+      updateMessageDeliveryStatus(params.localId, "error");
+    }
+  };
+
   const ownerName = useMemo(() => {
     if (!selectedRoom || !roomDetails) {
       return undefined;
@@ -289,8 +330,8 @@ const ChatLayout = () => {
     await joinRoomMutation.mutateAsync(selectedRoomId);
   };
 
-  const onSendMessage = async () => {
-    if (!selectedRoomId || !isMember || sendRoomMessageMutation.isPending) {
+  const onSendMessage = () => {
+    if (!selectedRoomId || !isMember) {
       return;
     }
 
@@ -299,12 +340,56 @@ const ChatLayout = () => {
       return;
     }
 
-    await sendRoomMessageMutation.mutateAsync({
-      roomId: selectedRoomId,
+    const localId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `local-${Date.now()}-${Math.round(Math.random() * 10000)}`;
+
+    const optimisticMessage: ChatMessage = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      localId,
+      deliveryStatus: "pending",
       content,
-    });
+      senderId: user?.id ?? "",
+      senderName: user?.name ?? "You",
+      senderAvatarUrl: user?.image ?? null,
+      roomId: selectedRoomId,
+      createdAt: new Date().toISOString(),
+    };
+
+    setRoomMessages((previous) =>
+      mergeMessages([...previous, optimisticMessage]),
+    );
     setScrollToBottomSignal((previous) => previous + 1);
     setMessageInput("");
+
+    void sendOptimisticMessage({
+      roomId: selectedRoomId,
+      localId,
+      content,
+    });
+  };
+
+  const onRetryMessage = (localId: string) => {
+    if (!selectedRoomId || !isMember) {
+      return;
+    }
+
+    const failedMessage = roomMessages.find(
+      (message) =>
+        message.localId === localId && message.deliveryStatus === "error",
+    );
+
+    if (!failedMessage) {
+      return;
+    }
+
+    updateMessageDeliveryStatus(localId, "pending");
+    void sendOptimisticMessage({
+      roomId: selectedRoomId,
+      localId,
+      content: failedMessage.content,
+    });
   };
 
   const onSelectRoom = (roomId: number, clearTarget = true) => {
@@ -418,7 +503,7 @@ const ChatLayout = () => {
           messageInput={messageInput}
           onMessageInputChange={setMessageInput}
           onSendMessage={onSendMessage}
-          sendingMessage={sendRoomMessageMutation.isPending}
+          onRetryMessage={onRetryMessage}
           notifications={liveNotifications}
           unreadNotificationCount={unreadNotificationCount}
           notificationsOpen={notificationsOpen}
