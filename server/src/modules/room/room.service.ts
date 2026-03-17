@@ -3,6 +3,7 @@ import redisClient from "../../lib/redisClient";
 import { logger } from "../../config/logger";
 import { CACHE_KEYS, CACHE_TTL } from "../../config/cache";
 import { invalidateRoomsListCache } from "../../lib/cache/roomsCache";
+import { getOnlineUsersLookup } from "../../lib/presence";
 import { mapRoomListItem } from "../../utils/roomMappers";
 import CustomError from "../../lib/errors";
 import type {
@@ -240,7 +241,14 @@ export const getRoomDetailsService = async (
           user: {
             select: {
               id: true,
-              name: true
+              name: true,
+              profiles: {
+                select: {
+                  displayName: true,
+                  username: true
+                },
+                take: 1
+              }
             }
           }
         }
@@ -252,6 +260,9 @@ export const getRoomDetailsService = async (
     throw new CustomError("Room not found", 404);
   }
 
+  const memberIds = room.members.map((member) => member.user.id);
+  const onlineUserIds = await getOnlineUsersLookup(memberIds);
+
   return {
     id: room.id,
     name: room.name,
@@ -260,7 +271,11 @@ export const getRoomDetailsService = async (
     avatarUrl: room.avatarUrl,
     members: room.members.map((member) => ({
       id: member.user.id,
-      username: member.user.name
+      displayName:
+        member.user.profiles[0]?.displayName?.trim() ||
+        member.user.profiles[0]?.username?.trim() ||
+        member.user.name,
+      isOnline: onlineUserIds.has(member.user.id)
     }))
   };
 };

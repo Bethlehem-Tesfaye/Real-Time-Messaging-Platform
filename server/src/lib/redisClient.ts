@@ -1,11 +1,25 @@
 import { createClient } from "redis";
+import { env } from "../config/environments";
 import { logger } from "../config/logger";
 
-const isProduction = process.env.NODE_ENV === "production";
-const redisClient = createClient({
-  url: process.env.REDIS_URL || "redis://localhost:6379",
-  ...(isProduction ? { tls: {} } : {})
-});
+const buildRedisOptions = () => {
+  const url = env.REDIS_URL || "redis://localhost:6379";
+
+  if (env.NODE_ENV === "production") {
+    return {
+      url,
+      socket: {
+        tls: true as const
+      }
+    };
+  }
+
+  return { url };
+};
+
+export const createRedisConnection = () => createClient(buildRedisOptions());
+
+const redisClient = createRedisConnection();
 
 redisClient.on("error", (err) => logger.error({ err }, "Redis error"));
 redisClient.on("connect", () => logger.info("Redis connected"));

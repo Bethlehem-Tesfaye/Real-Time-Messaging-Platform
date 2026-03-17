@@ -1,4 +1,5 @@
 import CustomError from "../../lib/errors";
+import { getOnlineUsersLookup } from "../../lib/presence";
 import { prisma } from "../../lib/prisma";
 import type { MessageItem } from "./types";
 
@@ -12,26 +13,30 @@ const resolveSenderName = (sender: {
   return displayName && displayName.length > 0 ? displayName : sender.name;
 };
 
-const toMessageItem = (message: {
-  id: number;
-  content: string;
-  roomId: number;
-  createdAt: Date;
-  sender: {
-    id: string;
-    name: string;
-    image: string | null;
-    profiles: Array<{
-      displayName: string | null;
-    }>;
-  };
-}): MessageItem => {
+const toMessageItem = (
+  message: {
+    id: number;
+    content: string;
+    roomId: number;
+    createdAt: Date;
+    sender: {
+      id: string;
+      name: string;
+      image: string | null;
+      profiles: Array<{
+        displayName: string | null;
+      }>;
+    };
+  },
+  senderIsOnline: boolean
+): MessageItem => {
   return {
     id: message.id,
     content: message.content,
     senderId: message.sender.id,
     senderName: resolveSenderName(message.sender),
     senderAvatarUrl: message.sender.image,
+    senderIsOnline,
     roomId: message.roomId,
     createdAt: message.createdAt.toISOString()
   };
@@ -86,7 +91,16 @@ export const getRoomMessagesService = async (
     }
   });
 
-  return messages.reverse().map(toMessageItem);
+  const senderIds = Array.from(
+    new Set(messages.map((message) => message.sender.id))
+  );
+  const onlineUserIds = await getOnlineUsersLookup(senderIds);
+
+  return messages
+    .reverse()
+    .map((message) =>
+      toMessageItem(message, onlineUserIds.has(message.sender.id))
+    );
 };
 
 export const createMessageService = async (
@@ -133,5 +147,10 @@ export const createMessageService = async (
     }
   });
 
-  return toMessageItem(createdMessage);
+  const onlineUserIds = await getOnlineUsersLookup([createdMessage.sender.id]);
+
+  return toMessageItem(
+    createdMessage,
+    onlineUserIds.has(createdMessage.sender.id)
+  );
 };
