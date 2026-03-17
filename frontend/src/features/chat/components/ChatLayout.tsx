@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { colors } from "../../../config/theme";
 import { connectSocket } from "../../../lib/socket";
 import { useMarkAllNotificationsRead } from "../../notification/hooks/useMarkAllNotificationsRead";
@@ -20,7 +21,12 @@ import { useRoomMessages } from "../hooks/useRoomMessages";
 import { useRooms } from "../hooks/useRooms";
 import { useSendRoomMessage } from "../hooks/useSendRoomMessage";
 import { useUpdateRoom } from "../hooks/useUpdateRoom";
-import type { ChatMessage } from "../types/chat";
+import type {
+  ChatMessage,
+  RoomDetails,
+  RoomMemberItem,
+  UserPresenceEvent,
+} from "../types/chat";
 
 type RoomFilterScope = "all" | "created" | "member";
 const EMPTY_MESSAGES: ChatMessage[] = [];
@@ -44,6 +50,7 @@ const ChatLayout = () => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
   const [targetMessageId, setTargetMessageId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const { user } = useCurrentUser();
   const { data: rooms = [], isLoading: roomsLoading } = useRooms({
@@ -133,8 +140,40 @@ const ChatLayout = () => {
       (member) => member.id === selectedRoom.ownerId,
     );
 
-    return ownerMember?.username ?? selectedRoom.ownerId;
+    return ownerMember?.displayName ?? selectedRoom.ownerId;
   }, [roomDetails, selectedRoom]);
+
+  const roomMembers = useMemo<RoomMemberItem[]>(() => {
+    return roomDetails?.members ?? [];
+  }, [roomDetails]);
+
+  const syncUserPresence = (userId: string, isOnline: boolean) => {
+    if (selectedRoomId) {
+      queryClient.setQueryData<RoomDetails>(
+        ["room", selectedRoomId],
+        (previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          return {
+            ...previous,
+            members: previous.members.map((member) =>
+              member.id === userId ? { ...member, isOnline } : member,
+            ),
+          };
+        },
+      );
+    }
+
+    setRoomMessages((previous) =>
+      previous.map((message) =>
+        message.senderId === userId
+          ? { ...message, senderIsOnline: isOnline }
+          : message,
+      ),
+    );
+  };
 
   useEffect(() => {
     if (rooms.length === 0) {
@@ -184,6 +223,16 @@ const ChatLayout = () => {
   useEffect(() => {
     const socket = connectSocket();
 
+    const syncSelectedRoomPresence = () => {
+      if (!selectedRoomId) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["room", selectedRoomId],
+      });
+    };
+
     const onReceiveNotification = (notification: NotificationItem) => {
       setLiveNotifications((previous) => {
         const deduped = new Map<number, NotificationItem>();
@@ -198,12 +247,30 @@ const ChatLayout = () => {
       });
     };
 
+    const onUserOnline = (payload: UserPresenceEvent) => {
+      syncUserPresence(payload.userId, true);
+    };
+
+    const onUserOffline = (payload: UserPresenceEvent) => {
+      syncUserPresence(payload.userId, false);
+    };
+
+    socket.on("connect", syncSelectedRoomPresence);
     socket.on("receive_notification", onReceiveNotification);
+    socket.on("user_online", onUserOnline);
+    socket.on("user_offline", onUserOffline);
+
+    if (socket.connected) {
+      syncSelectedRoomPresence();
+    }
 
     return () => {
+      socket.off("connect", syncSelectedRoomPresence);
       socket.off("receive_notification", onReceiveNotification);
+      socket.off("user_online", onUserOnline);
+      socket.off("user_offline", onUserOffline);
     };
-  }, []);
+  }, [queryClient, selectedRoomId]);
 
   useEffect(() => {
     if (!isMember) {
@@ -451,6 +518,8 @@ const ChatLayout = () => {
             roomName={selectedRoom?.name}
             roomAvatarUrl={selectedRoom?.avatarUrl}
             ownerName={ownerName}
+            ownerId={selectedRoom?.ownerId}
+            members={roomMembers}
             participantCount={
               roomLoading ? 0 : (roomDetails?.members.length ?? 0)
             }
@@ -513,6 +582,8 @@ const ChatLayout = () => {
             roomName={selectedRoom?.name}
             roomAvatarUrl={selectedRoom?.avatarUrl}
             ownerName={ownerName}
+            ownerId={selectedRoom?.ownerId}
+            members={roomMembers}
             participantCount={
               roomLoading ? 0 : (roomDetails?.members.length ?? 0)
             }

@@ -16,8 +16,13 @@ export type MessageItem = {
   senderId: string;
   senderName: string;
   senderAvatarUrl: string | null;
+  senderIsOnline: boolean;
   roomId: number;
   createdAt: string;
+};
+
+export type UserPresenceEvent = {
+  userId: string;
 };
 
 export type JoinRoomSocketPayload = {

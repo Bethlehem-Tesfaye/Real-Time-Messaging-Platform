@@ -8,7 +8,8 @@ export type RoomListItem = {
 
 export type RoomMemberItem = {
   id: string;
-  username: string;
+  displayName: string;
+  isOnline?: boolean;
 };
 
 export type RoomDetails = RoomListItem & {
@@ -42,12 +43,17 @@ export type RoomMembershipResponse = {
   isMember: boolean;
 };
 
+export type UserPresenceEvent = {
+  userId: string;
+};
+
 export type ChatMessage = {
   id: number;
   content: string;
   senderId: string;
   senderName: string;
   senderAvatarUrl: string | null;
+  senderIsOnline?: boolean;
   roomId: number;
   createdAt: string;
 };

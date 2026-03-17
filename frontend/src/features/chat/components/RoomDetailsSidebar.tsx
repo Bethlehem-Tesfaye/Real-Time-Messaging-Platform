@@ -1,11 +1,14 @@
 import { ChevronRight, Crown } from "lucide-react";
 import { colors } from "../../../config/theme";
+import type { RoomMemberItem } from "../types/chat";
 
 type RoomDetailsSidebarProps = {
   roomName?: string;
   roomAvatarUrl?: string | null;
   ownerName?: string;
+  ownerId?: string;
   participantCount: number;
+  members?: RoomMemberItem[];
   collapsed: boolean;
   onToggleCollapse: () => void;
 };
@@ -14,11 +17,24 @@ const RoomDetailsSidebar = ({
   roomName,
   roomAvatarUrl,
   ownerName,
+  ownerId,
   participantCount,
+  members = [],
   collapsed,
   onToggleCollapse,
 }: RoomDetailsSidebarProps) => {
   const roomInitial = roomName?.trim().charAt(0).toUpperCase() || "R";
+  const sortedMembers = [...members].sort((a, b) => {
+    if (a.id === ownerId && b.id !== ownerId) {
+      return -1;
+    }
+
+    if (b.id === ownerId && a.id !== ownerId) {
+      return 1;
+    }
+
+    return a.displayName.localeCompare(b.displayName);
+  });
 
   return (
     <aside
@@ -121,6 +137,83 @@ const RoomDetailsSidebar = ({
                 {ownerName ?? "—"}
               </p>
             </div>
+          </div>
+
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: `${colors.secondary}20`,
+              backgroundColor: `${colors.bg}5C`,
+            }}
+          >
+            <p
+              className="text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ color: colors.secondary }}
+            >
+              Members
+            </p>
+
+            {sortedMembers.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {sortedMembers.map((member) => {
+                  const memberInitial =
+                    member.displayName.trim().charAt(0).toUpperCase() || "U";
+                  const isOwner = member.id === ownerId;
+
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+                      style={{ backgroundColor: "#FFFFFF" }}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold"
+                          style={{
+                            backgroundColor: `${colors.secondary}14`,
+                            color: colors.primary,
+                          }}
+                        >
+                          {memberInitial}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p
+                              className="truncate text-sm font-semibold"
+                              style={{ color: colors.primary }}
+                            >
+                              {member.displayName}
+                            </p>
+                            {isOwner && (
+                              <Crown
+                                className="h-3.5 w-3.5 shrink-0"
+                                style={{ color: colors.notify }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: member.isOnline
+                            ? colors.online
+                            : `${colors.secondary}66`,
+                        }}
+                        aria-label={member.isOnline ? "Online" : "Offline"}
+                        title={member.isOnline ? "Online" : "Offline"}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm" style={{ color: colors.secondary }}>
+                No members yet.
+              </p>
+            )}
           </div>
         </div>
       )}

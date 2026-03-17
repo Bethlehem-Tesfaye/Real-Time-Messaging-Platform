@@ -1,10 +1,11 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { createClient } from "redis";
 import { fromNodeHeaders } from "better-auth/node";
 import { env } from "./config/environments";
 import { logger } from "./config/logger";
+import { createRedisConnection } from "./lib/redisClient";
+import { markUserOffline, markUserOnline } from "./lib/presence";
 import { auth } from "./modules/auth/auth";
 import {
   canUserAccessRoom,
@@ -17,7 +18,8 @@ import type {
   LeaveRoomSocketPayload,
   MessageItem,
   SendMessageSocketPayload,
-  SocketAck
+  SocketAck,
+  UserPresenceEvent
 } from "./modules/message/types";
 
 type SessionUser = {
@@ -34,9 +36,7 @@ export const emitRoomMessage = (roomId: number, message: MessageItem) => {
 };
 
 const initializeRedisAdapter = async (io: Server) => {
-  const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-
-  const pubClient = createClient({ url: redisUrl });
+  const pubClient = createRedisConnection();
   const subClient = pubClient.duplicate();
 
   await pubClient.connect();
@@ -47,8 +47,7 @@ const initializeRedisAdapter = async (io: Server) => {
 };
 
 const initializeNotificationSubscriber = async (io: Server) => {
-  const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-  const subscriberClient = createClient({ url: redisUrl });
+  const subscriberClient = createRedisConnection();
 
   await subscriberClient.connect();
 
@@ -141,6 +140,21 @@ export const registerSocketServer = (httpServer: HttpServer) => {
       { socketId: socket.id, userId: socket.data.userId },
       "Socket connected"
     );
+
+    markUserOnline(socket.data.userId, socket.id)
+      .then((result) => {
+        if (result.becameOnline) {
+          io.emit("user_online", {
+            userId: socket.data.userId
+          } satisfies UserPresenceEvent);
+        }
+      })
+      .catch((err) => {
+        logger.error(
+          { err, userId: socket.data.userId },
+          "Failed to register socket presence"
+        );
+      });
 
     socket.on(
       "join_room",
@@ -239,6 +253,21 @@ export const registerSocketServer = (httpServer: HttpServer) => {
         { socketId: socket.id, userId: socket.data.userId },
         "Socket disconnected"
       );
+
+      markUserOffline(socket.data.userId, socket.id)
+        .then((result) => {
+          if (result.becameOffline) {
+            io.emit("user_offline", {
+              userId: socket.data.userId
+            } satisfies UserPresenceEvent);
+          }
+        })
+        .catch((err) => {
+          logger.error(
+            { err, userId: socket.data.userId },
+            "Failed to clear socket presence"
+          );
+        });
     });
   });
 

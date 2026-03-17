@@ -30,7 +30,8 @@ export type RoomListItem = {
 
 export type RoomMemberItem = {
   id: string;
-  username: string;
+  displayName: string;
+  isOnline: boolean;
 };
 
 export type RoomDetailsResponse = RoomListItem & {

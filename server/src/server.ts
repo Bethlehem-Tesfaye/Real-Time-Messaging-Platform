@@ -6,6 +6,7 @@ import { logger } from "./config/logger";
 import { env } from "./config/environments";
 import conn from "./config/db";
 import { connectRedis } from "./lib/redisClient";
+import { resetPresenceState } from "./lib/presence";
 import { registerSocketServer } from "./socket";
 
 const PORT = Number(env.PORT) || 5000;
@@ -17,6 +18,8 @@ const startServer = async () => {
 
     await connectRedis();
     logger.info("redis connected");
+
+    await resetPresenceState();
 
     const httpServer = createServer(app);
     registerSocketServer(httpServer);
