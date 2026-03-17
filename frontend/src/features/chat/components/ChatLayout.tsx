@@ -30,10 +30,25 @@ import type {
 
 type RoomFilterScope = "all" | "created" | "member";
 const EMPTY_MESSAGES: ChatMessage[] = [];
+const SELECTED_ROOM_STORAGE_KEY = "chat:selectedRoomId";
 
 const ChatLayout = () => {
   const [selectedRoomId, setSelectedRoomId] = useState<number | undefined>(
-    undefined,
+    () => {
+      if (typeof window === "undefined") {
+        return undefined;
+      }
+
+      const storedValue = window.localStorage.getItem(
+        SELECTED_ROOM_STORAGE_KEY,
+      );
+      if (!storedValue) {
+        return undefined;
+      }
+
+      const parsed = Number(storedValue);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    },
   );
   const [roomFilterScope, setRoomFilterScope] =
     useState<RoomFilterScope>("all");
@@ -226,10 +241,26 @@ const ChatLayout = () => {
       (room) => room.id === selectedRoomId,
     );
 
-    if (!selectedRoomId || !selectedStillExists) {
-      setSelectedRoomId(rooms[0].id);
+    if (selectedRoomId && !selectedStillExists) {
+      setSelectedRoomId(undefined);
     }
   }, [rooms, selectedRoomId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (selectedRoomId) {
+      window.localStorage.setItem(
+        SELECTED_ROOM_STORAGE_KEY,
+        String(selectedRoomId),
+      );
+      return;
+    }
+
+    window.localStorage.removeItem(SELECTED_ROOM_STORAGE_KEY);
+  }, [selectedRoomId]);
 
   useEffect(() => {
     setMessageInput("");

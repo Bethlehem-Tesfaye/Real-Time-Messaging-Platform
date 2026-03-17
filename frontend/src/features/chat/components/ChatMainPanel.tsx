@@ -73,7 +73,7 @@ const ChatMainPanel = ({
       >
         <div className="grid h-full place-items-center">
           <p style={{ color: colors.secondary }}>
-            Select a group from the left sidebar.
+            Select a room to start messaging.
           </p>
         </div>
       </main>

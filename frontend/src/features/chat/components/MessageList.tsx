@@ -41,6 +41,7 @@ const MessageList = ({
   const latestNearBottomRef = useRef(true);
   const previousRoomIdRef = useRef<number | undefined>(roomId);
   const roomScrollTopByIdRef = useRef<Map<number, number>>(new Map());
+  const initialPositionedRoomIdsRef = useRef<Set<number>>(new Set());
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<
@@ -150,6 +151,67 @@ const MessageList = ({
       });
     });
   }, [roomId]);
+
+  useEffect(() => {
+    if (
+      typeof roomId !== "number" ||
+      loading ||
+      showJoinPrompt ||
+      initialPositionedRoomIdsRef.current.has(roomId)
+    ) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const savedScrollTop = roomScrollTopByIdRef.current.get(roomId);
+    if (typeof savedScrollTop === "number") {
+      initialPositionedRoomIdsRef.current.add(roomId);
+      return;
+    }
+
+    if (sortedMessages.length === 0) {
+      initialPositionedRoomIdsRef.current.add(roomId);
+      return;
+    }
+
+    const messageIds = new Set(sortedMessages.map((message) => message.id));
+    const unreadInRoom = unreadMessageIds
+      .filter((id) => messageIds.has(id))
+      .sort((a, b) => a - b);
+
+    const firstUnreadId = unreadInRoom[0];
+
+    if (typeof firstUnreadId === "number") {
+      const firstUnreadIndex = sortedMessages.findIndex(
+        (message) => message.id === firstUnreadId,
+      );
+      const lastReadMessage =
+        firstUnreadIndex > 0 ? sortedMessages[firstUnreadIndex - 1] : undefined;
+      const anchorMessageId = lastReadMessage?.id ?? firstUnreadId;
+      const anchorElement = messageRefs.current.get(anchorMessageId);
+
+      if (anchorElement) {
+        anchorElement.scrollIntoView({
+          behavior: "auto",
+          block: lastReadMessage ? "end" : "start",
+        });
+      }
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+    }
+
+    initialPositionedRoomIdsRef.current.add(roomId);
+
+    requestAnimationFrame(() => {
+      const nearBottom = isNearBottom();
+      latestNearBottomRef.current = nearBottom;
+      setShowScrollToBottom(!nearBottom);
+    });
+  }, [roomId, loading, showJoinPrompt, sortedMessages, unreadMessageIds]);
 
   useEffect(() => {
     if (!sortedMessages.length || unreadMessageIds.length === 0) {

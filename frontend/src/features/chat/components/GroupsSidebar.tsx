@@ -272,7 +272,7 @@ const GroupsSidebar = ({
             className="text-sm xl:text-[0.95rem]"
             style={{ color: `${colors.secondary}B8` }}
           >
-            Select a group room to start chatting.
+            Select a room to start chatting.
           </p>
 
           <div className="mt-10 grid grid-cols-3 gap-2">
